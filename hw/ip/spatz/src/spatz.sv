@@ -28,6 +28,7 @@ module spatz import spatz_pkg::*; import rvv_pkg::*; import fpnew_pkg::*; #(
     parameter type                          spatz_rsp_t         = logic,
     /// FPU configuration.
     parameter fpu_implementation_t          FPUImplementation   = fpu_implementation_t'(0),
+    parameter fpu_implementation_t          FPUImplementation0  = fpu_implementation_t'(0),
     // Derived parameters. DO NOT CHANGE!
     parameter int                  unsigned NumOutstandingLoads = 8
   ) (
@@ -276,7 +277,8 @@ module spatz import spatz_pkg::*; import rvv_pkg::*; import fpnew_pkg::*; #(
   /////////
 
   spatz_vfu #(
-    .FPUImplementation(FPUImplementation)
+    .FPUImplementation(FPUImplementation),
+    .FPUImplementation0(FPUImplementation0)
   ) i_vfu (
     .clk_i            (clk_i                                                   ),
     .rst_ni           (rst_ni                                                  ),

@@ -1698,7 +1698,85 @@ void crossentropy_forward(float* losses,
         }
     }
 }
+void fast_tanh_cheby_f32_deg4(const float* inp, float* out,
+                              int memload, int vnum, int lmul, int size, unsigned int vl)
+{
+    // FP32 constants
+    const float LOG2E = 1.4426950408889634f;   // 1/ln(2)
+    const float LN2   = 0.6931471805599453f;   // ln(2)
+    // Degree-4 Chebyshev→monomial for exp(r) on r ∈ [-ln2/2, +ln2/2] (use RNE coeffs)
+    const float A0 = 1.00000000f;
+    const float A1 = 0.99996230f;
+    const float A2 = 0.49998870f;
+    const float A3 = 0.16792161f;
+    const float A4 = 0.04191753f;
+    const int32_t EXP_BIAS_32 = 127;
 
+    // (Optional) debug setup
+    int cid = snrt_cluster_core_idx();
+
+    // SEW=32, LMUL=m8; load x -> v0
+    asm volatile("vsetvli %0, %1, e32, m8, ta, ma" : "=r"(vl) : "r"(size));
+    asm volatile("vle32.v   v0, (%0)" :: "r"(inp));                        // v0 = x
+
+    // sign(x) -> v8 (±1), |x| -> v0
+    asm volatile("vfmv.v.f  v8,  %0" :: "f"(1.0f));
+    asm volatile("vfsgnj.vv v8,  v8,  v0");                                // v8 = ±1 with sign(x)
+    asm volatile("vfsgnjx.vv v0,  v0,  v0");                                // v0 = |x|
+    
+
+    // z = 2*|x|  (reuse v0)
+    asm volatile("vfmul.vf  v0,  v0,  %0" :: "f"(2.0f));                               // v0 = z
+
+    // Range reduction for exp(z): y=z*LOG2E; k = (FRM-dependent) int(y); r = z - k*LN2
+    asm volatile("vfmul.vf        v24, v0,  %0" :: "f"(LOG2E));             // v24 = y
+
+    asm volatile("vfcvt.x.f.v     v16, v24");                                // v16 = k (i32) [FRM-dependent]
+
+    asm volatile("vfcvt.f.x.v     v24, v16");                                // v24 = k (f32)
+
+    asm volatile("vfnmsac.vf      v0,  %0,  v24" :: "f"(LN2));               // v0 = r
+
+    // ---- Quartic Horner: P(r) = A0 + r*(A1 + r*(A2 + r*(A3 + r*A4))) ----
+    // s = A3 + r*A4
+    asm volatile("vfmv.v.f        v24, %0" :: "f"(A3));                      // v24 = A3
+    asm volatile("vfmacc.vf       v24, %0, v0" :: "f"(A4));                  // v24 = A3 + r*A4
+
+    // t = A2 + r*s   (reuse v24)
+    asm volatile("vfmul.vv        v24, v24, v0");                            // v24 = r*s
+    asm volatile("vfadd.vf        v24, v24, %0" :: "f"(A2));                 // v24 = t
+
+    // u = A1 + r*t   (reuse v24)
+    asm volatile("vfmul.vv        v24, v24, v0");                            // v24 = r*t
+    asm volatile("vfadd.vf        v24, v24, %0" :: "f"(A1));                 // v24 = u
+
+    // P = A0 + r*u   → put in v0
+    asm volatile("vfmul.vv        v0,  v0,  v24");                           // v0 = r*u
+    asm volatile("vfadd.vf        v0,  v0,  %0" :: "f"(A0));                 // v0 = P(r)
+
+    // E = P * 2^k  (exponent injection: (k+127)<<23 in v16)
+    asm volatile("vadd.vx         v16, v16, %0" :: "r"(EXP_BIAS_32));        // k += 127
+
+    asm volatile("vsll.vi         v16, v16, 23");                             // exponent field
+
+
+    asm volatile("vfmul.vv        v0,  v0,  v16");                            // v0 = E ≈ exp(2*|x|)
+
+    // tanh(x) = sign(x) * (1 - 2/(E+1))
+    asm volatile("vfadd.vf        v24, v0,  %0" :: "f"(1.0f));                // v24 = E + 1
+
+    asm volatile("vfmv.v.f        v16, %0" :: "f"(2.0f));
+
+    asm volatile("vfdiv.vv        v24, v16, v24");                            // v24 = 2/(E+1)
+
+    asm volatile("vfmv.v.f        v16, %0" :: "f"(1.0f));
+
+    asm volatile("vfsub.vv        v24, v16, v24");                            // v24 = 1 - 2/(E+1)
+
+    // apply sign and store
+    asm volatile("vfmul.vv        v0,  v24, v8");                             // v0 = tanh(x)
+    asm volatile("vse32.v         v0, (%0)" :: "r"(out));
+}
 void crossentropy_softmax_backward(float* dlogits,
                            float* dlosses, float* probs, int* targets,
                            int B, int T, int V, int Vp, 
@@ -1884,30 +1962,30 @@ int main() {
     //---------------------------------------------------------
 
     //--------------------------------------------------------- layernorm_backward
-    if (cid == 0) {
-        inp    = (float*)snrt_l1alloc(B * T * C * sizeof(float));
-        dinp   = (float*)snrt_l1alloc(B * T * C * sizeof(float));
-        mean   = (float*)snrt_l1alloc(B * T * 1 * sizeof(float));
-        rstd   = (float*)snrt_l1alloc(B * T * 1 * sizeof(float));
-        dweight= (float*)snrt_l1alloc(1 * 1 * C * sizeof(float));
-        weight = (float*)snrt_l1alloc(1 * 1 * C * sizeof(float));
-        dbias  = (float*)snrt_l1alloc(1 * 1 * C * sizeof(float));
-        dout   = (float*)snrt_l1alloc(B * T * C * sizeof(float));
-        snrt_dma_start_1d(inp    , data1_dram, B * T * C * sizeof(float));
-        snrt_dma_start_1d(dinp   , data1_dram, B * T * C * sizeof(float));
-        snrt_dma_start_1d(dweight, data1_dram, 1 * 1 * C * sizeof(float));
-        snrt_dma_start_1d(weight , data1_dram, 1 * 1 * C * sizeof(float));
-        snrt_dma_start_1d(dbias  , data1_dram, 1 * 1 * C * sizeof(float));
-        snrt_dma_start_1d(mean   , data1_dram, B * T * 1 * sizeof(float));
-        snrt_dma_start_1d(rstd   , data1_dram, B * T * 1 * sizeof(float));
-        snrt_dma_start_1d(dout   , data1_dram, B * T * C * sizeof(float));
-        snrt_dma_wait_all();
-    }
-    snrt_cluster_hw_barrier();
-    timer = benchmark_get_cycle();
-    start_kernel();    
-    layernorm_backward(dinp, dweight, dbias, dout, inp, weight, mean, rstd, B, T, C, vl);
-    stop_kernel();
+    // if (cid == 0) {
+    //     inp    = (float*)snrt_l1alloc(B * T * C * sizeof(float));
+    //     dinp   = (float*)snrt_l1alloc(B * T * C * sizeof(float));
+    //     mean   = (float*)snrt_l1alloc(B * T * 1 * sizeof(float));
+    //     rstd   = (float*)snrt_l1alloc(B * T * 1 * sizeof(float));
+    //     dweight= (float*)snrt_l1alloc(1 * 1 * C * sizeof(float));
+    //     weight = (float*)snrt_l1alloc(1 * 1 * C * sizeof(float));
+    //     dbias  = (float*)snrt_l1alloc(1 * 1 * C * sizeof(float));
+    //     dout   = (float*)snrt_l1alloc(B * T * C * sizeof(float));
+    //     snrt_dma_start_1d(inp    , data1_dram, B * T * C * sizeof(float));
+    //     snrt_dma_start_1d(dinp   , data1_dram, B * T * C * sizeof(float));
+    //     snrt_dma_start_1d(dweight, data1_dram, 1 * 1 * C * sizeof(float));
+    //     snrt_dma_start_1d(weight , data1_dram, 1 * 1 * C * sizeof(float));
+    //     snrt_dma_start_1d(dbias  , data1_dram, 1 * 1 * C * sizeof(float));
+    //     snrt_dma_start_1d(mean   , data1_dram, B * T * 1 * sizeof(float));
+    //     snrt_dma_start_1d(rstd   , data1_dram, B * T * 1 * sizeof(float));
+    //     snrt_dma_start_1d(dout   , data1_dram, B * T * C * sizeof(float));
+    //     snrt_dma_wait_all();
+    // }
+    // snrt_cluster_hw_barrier();
+    // timer = benchmark_get_cycle();
+    // start_kernel();    
+    // layernorm_backward(dinp, dweight, dbias, dout, inp, weight, mean, rstd, B, T, C, vl);
+    // stop_kernel();
     // if(cid == 0){
     //     printf("CHECK RESULTS1\n");
     //     check_result(dbias    , dbiasG   , 1 * 1 * C);
@@ -2210,18 +2288,18 @@ int main() {
     //---------------------------------------------------------
 
     //--------------------------------------------------------- fast_exp
-    // if (cid == 0) {
-    //     inp       = (float*)snrt_l1alloc(B * T * C * sizeof(float));
-    //     out       = (float*)snrt_l1alloc(B * T * C * sizeof(float));
-    //     snrt_dma_start_1d(inp    , data1_dram, B * T * C * sizeof(float));
-    //     snrt_dma_wait_all();
-    // }
-    // snrt_cluster_hw_barrier();
-    // start_kernel();    
-    // for (int i = 0; i < ((B*T*C)/VLMAX); i++){
-    //     fast_exp(inp+i*VLMAX, out+i*VLMAX, 1, 0, 8, VLMAX, vl);
-    // }
-    // stop_kernel();
+    if (cid == 0) {
+        inp       = (float*)snrt_l1alloc(B * T * C * sizeof(float));
+        out       = (float*)snrt_l1alloc(B * T * C * sizeof(float));
+        snrt_dma_start_1d(inp    , data1_dram, B * T * C * sizeof(float));
+        snrt_dma_wait_all();
+    }
+    snrt_cluster_hw_barrier();
+    start_kernel();    
+    for (int i = 0; i < ((B*T*C)/VLMAX); i++){
+        fast_tanh_cheby_f32_deg4(inp+i*VLMAX, out+i*VLMAX, 1, 0, 8, VLMAX, vl);
+    }
+    stop_kernel();
     // if(cid == 0){
     //     printf("CHECK RESULTS1\n");
     //     check_result(out      , outG    , B * T * C);   

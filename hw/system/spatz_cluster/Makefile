@@ -11,8 +11,8 @@ MKFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MKFILE_DIR  := $(dir $(MKFILE_PATH))
 
 # Configuration file
-SPATZ_CLUSTER_CFG         ?= $(SPATZ_CLUSTER_DIR)/cfg/spatz_cluster1.hjson
-# SPATZ_CLUSTER_CFG         ?= $(SPATZ_CLUSTER_DIR)/cfg/spatz_cluster.default.hjson
+#SPATZ_CLUSTER_CFG         ?= $(SPATZ_CLUSTER_DIR)/cfg/spatz_cluster1.hjson
+SPATZ_CLUSTER_CFG         ?= $(SPATZ_CLUSTER_DIR)/cfg/spatz_cluster.default.hjson
 SPATZ_CLUSTER_CFG_DEFINES += -DMEM_DRAM_ORIGIN=$(shell python3 -c "import jstyleson; f = open('$(SPATZ_CLUSTER_CFG)'); print(jstyleson.load(f)['dram']['address'])")
 SPATZ_CLUSTER_CFG_DEFINES += -DMEM_DRAM_SIZE=$(shell python3 -c "import jstyleson; f = open('$(SPATZ_CLUSTER_CFG)'); print(jstyleson.load(f)['dram']['length'])")
 SPATZ_CLUSTER_CFG_DEFINES += -DSNRT_BASE_HARTID=$(shell python3 -c "import jstyleson; f = open('$(SPATZ_CLUSTER_CFG)'); print(jstyleson.load(f)['cluster']['cluster_base_hartid'])")
@@ -220,6 +220,8 @@ clean.sw:
 ## Clean everything except logs
 clean: clean.vcs clean.vlt clean.vsim clean.sw
 	rm -rf Bender.lock .bender/ work/
+	rm -rf ../../ip/spatz/src/generated/
+	rm -rf src/generated/
 
 clean.logs:
 	rm -rf logs/

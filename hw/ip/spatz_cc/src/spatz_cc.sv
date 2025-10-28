@@ -51,6 +51,7 @@ module spatz_cc
     parameter type                                         dma_perf_t               = logic,
     /// FPU configuration.
     parameter fpu_implementation_t                         FPUImplementation        = fpu_implementation_t'(0),
+    parameter fpu_implementation_t                         FPUImplementation0       = fpu_implementation_t'(0),
     /// Boot address of core.
     parameter logic                                 [31:0] BootAddr                 = 32'h0000_1000,
     /// Reduced-register extension
@@ -281,6 +282,7 @@ module spatz_cc
     .NrMemPorts         (NumMemPortsPerSpatz     ),
     .NumOutstandingLoads(NumSpatzOutstandingLoads),
     .FPUImplementation  (FPUImplementation       ),
+    .FPUImplementation0 (FPUImplementation0      ),
     .RegisterRsp        (RegisterOffloadRsp      ),
     .dreq_t             (dreq_t                  ),
     .drsp_t             (drsp_t                  ),
