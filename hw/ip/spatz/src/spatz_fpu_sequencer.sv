@@ -531,6 +531,7 @@ module spatz_fpu_sequencer
     .dreq_t             (dreq_t             ),
     .drsp_t             (drsp_t             ),
     .DataWidth          (FLEN               ),
+    .NumOutstandingMem  (NumOutstandingLoads),
     .NumOutstandingLoads(NumOutstandingLoads)
   ) i_fp_lsu (
     .clk_i        (clk_i           ),
@@ -739,7 +740,7 @@ module spatz_fpu_sequencer
     // Commit a move result
     else if (fp_move_result_valid_o) begin
       resp_o                 = fp_move_result_o;
-      resp_valid_o           = 1'b1;
+      resp_valid_o           = fp_move_result_valid_o;
       fp_move_result_ready_i = resp_ready_i;
     end
 

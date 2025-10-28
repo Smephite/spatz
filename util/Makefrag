@@ -68,6 +68,7 @@ VLOGAN_FLAGS := -assert svaext
 VLOGAN_FLAGS += -assert disable_cover
 VLOGAN_FLAGS += -full64
 VLOGAN_FLAGS += -kdb
+VLOGAN_FLAGS += -timescale=1ns/1ps
 VHDLAN_FLAGS := -full64
 VHDLAN_FLAGS += -kdb
 
@@ -133,13 +134,13 @@ define QUESTASIM
 	@mkdir -p bin
 	@echo "#!/bin/bash" > $@
 	@echo 'echo `realpath $$1` > bin/logs/.rtlbinary' >> $@
-	@echo '${VSIM} +permissive ${VSIM_FLAGS} -work ${MKFILE_DIR}/${VSIM_BUILDDIR} -c \
+	@echo '${VSIM} +permissive ${VSIM_FLAGS_SHELL} -work ${MKFILE_DIR}/${VSIM_BUILDDIR} -c \
 				-ldflags "-Wl,-rpath,${FESVR}/lib -L${FESVR}/lib -lfesvr_vsim -lutil" \
 				$1 +permissive-off ++$$1' >> $@
 	@chmod +x $@
 	@echo "#!/bin/bash" > $@.gui
 	@echo 'echo `realpath $$1` > bin/logs/.rtlbinary' >> $@
-	@echo '${VSIM} +permissive ${VSIM_FLAGS} -work ${MKFILE_DIR}/${VSIM_BUILDDIR} \
+	@echo '${VSIM} +permissive ${VSIM_FLAGS_GUI} -work ${MKFILE_DIR}/${VSIM_BUILDDIR} \
 				-ldflags "-Wl,-rpath,${FESVR}/lib -L${FESVR}/lib -lfesvr_vsim -lutil" \
 				$1 +permissive-off ++$$1' >> $@.gui
 	@chmod +x $@.gui
@@ -152,7 +153,7 @@ work-vcs/compile.sh: ${VSIM_SOURCES} ${TB_SRCS}
 	mkdir -p work-vcs
 	${BENDER} script vcs ${VSIM_BENDER} ${DEFS} --vlog-arg="${VLOGAN_FLAGS}" --vcom-arg="${VHDLAN_FLAGS}" > $@
 	chmod +x $@
-	$@ > work-vcs/compile.log
+	$@ | tee work-vcs/compile.log
 
 ########
 # Util #

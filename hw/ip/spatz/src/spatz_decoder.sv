@@ -217,6 +217,14 @@ module spatz_decoder
         riscv_instr::VSUB_VX,
         riscv_instr::VRSUB_VX,
         riscv_instr::VRSUB_VI,
+        riscv_instr::VWADD_VV,
+        riscv_instr::VWADD_VX,
+        riscv_instr::VWADDU_VV,
+        riscv_instr::VWADDU_VX,
+        riscv_instr::VWSUB_VV,
+        riscv_instr::VWSUB_VX,
+        riscv_instr::VWSUBU_VV,
+        riscv_instr::VWSUBU_VX,
         riscv_instr::VAND_VV,
         riscv_instr::VAND_VX,
         riscv_instr::VAND_VI,
@@ -384,6 +392,39 @@ module spatz_decoder
             riscv_instr::VRSUB_VX,
             riscv_instr::VRSUB_VI: begin
               spatz_req.op = VRSUB;
+            end
+
+            // Vector Widening Arithmetic
+            riscv_instr::VWADD_VV,
+            riscv_instr::VWADD_VX: begin
+              spatz_req.op                  = VADD;
+              spatz_req.op_arith.widen_vs1  = 1'b1;
+              spatz_req.op_arith.signed_vs1 = 1'b1;
+              spatz_req.op_arith.widen_vs2  = 1'b1;
+              spatz_req.op_arith.signed_vs2 = 1'b1;
+            end
+
+            riscv_instr::VWADDU_VV,
+            riscv_instr::VWADDU_VX: begin
+              spatz_req.op                 = VADD;
+              spatz_req.op_arith.widen_vs1 = 1'b1;
+              spatz_req.op_arith.widen_vs2 = 1'b1;
+            end
+
+            riscv_instr::VWSUB_VV,
+            riscv_instr::VWSUB_VX: begin
+              spatz_req.op                  = VSUB;
+              spatz_req.op_arith.widen_vs1  = 1'b1;
+              spatz_req.op_arith.signed_vs1 = 1'b1;
+              spatz_req.op_arith.widen_vs2  = 1'b1;
+              spatz_req.op_arith.signed_vs2 = 1'b1;
+            end
+
+            riscv_instr::VWSUBU_VV,
+            riscv_instr::VWSUBU_VX: begin
+              spatz_req.op                 = VSUB;
+              spatz_req.op_arith.widen_vs1 = 1'b1;
+              spatz_req.op_arith.widen_vs2 = 1'b1;
             end
 
             // Vector Logic
@@ -742,10 +783,10 @@ module spatz_decoder
               // vmv is the same as a zero slide
               spatz_req.op                 = VSLIDEUP;
               spatz_req.ex_unit            = SLD;
-              spatz_req.op_sld.insert      = (func3 == OPIVI || func3 == OPIVX);
+              spatz_req.op_sld.insert      = (func3 == OPIVI || func3 == OPIVX || func3 == OPMVX);
               spatz_req.op_sld.vmv         = 1'b1;
               spatz_req.vs2                = spatz_req.vs1;
-              spatz_req.use_vs2            = func3 != OPIVI || decoder_req_i.instr inside {riscv_instr::VMV_S_X};
+              spatz_req.use_vs2            = (func3 == OPIVV);
               spatz_req.op_arith.is_scalar = decoder_req_i.instr inside {riscv_instr::VMV_S_X};
             end
 
@@ -1081,7 +1122,7 @@ module spatz_decoder
                 spatz_req.rs1                = decoder_req_i.rs1;
                 spatz_req.use_vs1            = 1'b0;
                 spatz_req.vs2                = spatz_req.vs1;
-                spatz_req.use_vs2            = decoder_req_i.instr inside {riscv_instr::VFMV_S_F};
+                spatz_req.use_vs2            = 1'b0;
                 spatz_req.op_arith.is_scalar = decoder_req_i.instr inside {riscv_instr::VFMV_S_F};
               end
 

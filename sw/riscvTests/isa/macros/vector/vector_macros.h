@@ -122,7 +122,7 @@ int test_case;
 // Check the result against a scalar golden value
 #define XCMP(casenum, act, exp)                                                \
   if (act != exp) {                                                            \
-    printf("FAILED. Got %d, expected %d.\n", casenum, act, exp);               \
+    printf("[TC %d] FAILED. Got %d, expected %d.\n", casenum, act, exp);       \
     num_failed++;                                                              \
     return;                                                                    \
   }                                                                            \
@@ -131,7 +131,7 @@ int test_case;
 // Check the result against a floating-point scalar golden value
 #define FCMP(casenum, act, exp)                                                \
   if (act != exp) {                                                            \
-    printf("FAILED. Got %lf, expected %lf.\n", casenum, act, exp);             \
+    printf("[TC %d] FAILED. Got %lf, expected %lf.\n", casenum, act, exp);     \
     num_failed++;                                                              \
     return;                                                                    \
   }                                                                            \
@@ -149,7 +149,7 @@ int test_case;
         return;                                                                \
       }                                                                        \
     }                                                                          \
-    printf("PASSED.\n");                                                       \
+    printf("[TC %d] PASSED.\n", casenum);                                                       \
   } while (0)
 
 // Check the results against an in-memory vector of golden values
