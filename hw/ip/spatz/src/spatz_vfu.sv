@@ -404,7 +404,7 @@ module spatz_vfu
 
         // Do we have a new reduction instruction?
         if (spatz_req_valid && !running_q[spatz_req.id] && spatz_req.op_arith.is_reduction)
-          reduction_state_d = (is_fpu_busy || !fpu_load_ready[0]) ? Reduction_Wait : Reduction_Init;
+          reduction_state_d = (is_fpu_busy /*|| !fpu_load_ready[0]*/) ? Reduction_Wait : Reduction_Init;
       end
 
       Reduction_Wait: begin

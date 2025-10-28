@@ -4,7 +4,7 @@
 
 set(SNITCH_RUNTIME "snRuntime-cluster" CACHE STRING "Target name of the snRuntime flavor to link against")
 set(SNITCH_SIMULATOR "" CACHE PATH "Command to run a binary in an RTL simulation")
-set(SIMULATOR_TIMEOUT "1800" CACHE STRING "Timeout when running tests on RTL simulation")
+set(SIMULATOR_TIMEOUT "60" CACHE STRING "Timeout when running tests on RTL simulation")
 set(SPIKE_DASM "spike-dasm" CACHE PATH "Path to the spike-dasm for generating traces")
 set(LLVM_PATH "/home/spatz" CACH PATH "Path to the LLVM RISCV installation")
 set(GCC_PATH "/home/spatz" CACHE PATH "Path to the GCC RISCV installation")

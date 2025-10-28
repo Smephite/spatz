@@ -25,7 +25,7 @@ endif()
 add_compile_options(-O3 -g -ffunction-sections)
 
 # Platform sources
-if("${SPATZ_CLUSTER_CFG}" STREQUAL "spatz_cluster.default.dram.hjson" OR ${SPATZ_CLUSTER_CFG} STREQUAL "spatz_cluster.mempool.dram.hjson")
+if("${SPATZ_CLUSTER_CFG}" STREQUAL "spatz_cluster.default.dram.hjson" OR "${SPATZ_CLUSTER_CFG}" STREQUAL "spatz_cluster.mempool.dram.hjson")
   set(_plat_folder "standalone")
 elseif("${SPATZ_CLUSTER_CFG}" MATCHES "^spatz_cluster.carfield\\.(l2|dram)\\.hjson$")
   set(_plat_folder "cheshire")

@@ -21,8 +21,6 @@ module spatz_vrf
     input  logic      [NrWritePorts-1:0] we_i,
     input  vrf_be_t   [NrWritePorts-1:0] wbe_i,
     output logic      [NrWritePorts-1:0] wvalid_o,
-    output logic      [NrWritePorts-1:0] wvalid_vlsu_o,
-    output logic      [NrWritePorts-1:0] wbe_o,
     // Read ports
     input  vrf_addr_t [NrReadPorts-1:0]  raddr_i,
     input  logic      [NrReadPorts-1:0]  re_i,
@@ -83,32 +81,12 @@ module spatz_vrf
     end
   end: gen_write_request
 
-  vrf_be_t [NrVRFBanks-1:0] wbe_d,wbe_q;
-
-  always_ff @(posedge clk_i or negedge rst_ni) begin
-    if(~rst_ni) begin
-      wbe_q <= '0;
-    end else begin
-      for (int bank = 0; bank < NrVRFBanks; bank++) begin
-        if(!write_request[bank][VLSU_VD_WD])begin
-          wbe_q[bank] <= '0;
-        end else begin
-          wbe_q[bank] <= wbe_d[bank];
-        end
-      end
-    end
-  end
-
-
-
   always_comb begin : proc_write
     waddr    = '0;
     wdata    = '0;
     we       = '0;
     wbe      = '0;
     wvalid_o = '0;
-    wvalid_vlsu_o = '0;
-    wbe_d    = wbe_q;
 
     // For each bank, we have a priority based access scheme. First priority always has the VFU,
     // second priority has the LSU, and third priority has the slide unit.
@@ -119,21 +97,19 @@ module spatz_vrf
         wdata[bank]         = wdata_i[VFU_VD_WD];
         we[bank]            = 1'b1;
         wbe[bank]           = wbe_i[VFU_VD_WD];
-        wvalid_o[VFU_VD_WD] = 1'b1;//0
+        wvalid_o[VFU_VD_WD] = 1'b1;
       end else if (write_request[bank][VLSU_VD_WD]) begin
         waddr[bank]          = f_vreg(waddr_i[VLSU_VD_WD]);
         wdata[bank]          = wdata_i[VLSU_VD_WD];
         we[bank]             = 1'b1;
         wbe[bank]            = wbe_i[VLSU_VD_WD];
-        wbe_d[bank]          = wbe_q[bank]|wbe_i[VLSU_VD_WD];
-        wvalid_o[VLSU_VD_WD] = &(wbe_q[bank]|wbe_i[VLSU_VD_WD]);//1
-        wvalid_vlsu_o[VLSU_VD_WD] = 1'b1;//1
+        wvalid_o[VLSU_VD_WD] = 1'b1;
       end else if (write_request[bank][VSLDU_VD_WD]) begin
         waddr[bank]           = f_vreg(waddr_i[VSLDU_VD_WD]);
         wdata[bank]           = wdata_i[VSLDU_VD_WD];
         we[bank]              = 1'b1;
         wbe[bank]             = wbe_i[VSLDU_VD_WD];
-        wvalid_o[VSLDU_VD_WD] = 1'b1;//2
+        wvalid_o[VSLDU_VD_WD] = 1'b1;
       end
     end
   end
@@ -165,33 +141,33 @@ module spatz_vrf
       if (read_request[bank][VFU_VS2_RD]) begin
         raddr[bank][0]       = f_vreg(raddr_i[VFU_VS2_RD]);
         rdata_o[VFU_VS2_RD]  = rdata[bank][0];
-        rvalid_o[VFU_VS2_RD] = 1'b1;//0
+        rvalid_o[VFU_VS2_RD] = 1'b1;
       end else if (read_request[bank][VLSU_VS2_RD]) begin
         raddr[bank][0]        = f_vreg(raddr_i[VLSU_VS2_RD]);
         rdata_o[VLSU_VS2_RD]  = rdata[bank][0];
-        rvalid_o[VLSU_VS2_RD] = 1'b1;//3
+        rvalid_o[VLSU_VS2_RD] = 1'b1;
       end
 
       // Bank read port 1 - Priority: VFU (1) -> VSLDU
       if (read_request[bank][VFU_VS1_RD]) begin
         raddr[bank][1]       = f_vreg(raddr_i[VFU_VS1_RD]);
         rdata_o[VFU_VS1_RD]  = rdata[bank][1];
-        rvalid_o[VFU_VS1_RD] = 1'b1;//1
+        rvalid_o[VFU_VS1_RD] = 1'b1;
       end else if (read_request[bank][VSLDU_VS2_RD]) begin
         raddr[bank][1]         = f_vreg(raddr_i[VSLDU_VS2_RD]);
         rdata_o[VSLDU_VS2_RD]  = rdata[bank][1];
-        rvalid_o[VSLDU_VS2_RD] = 1'b1;//4
+        rvalid_o[VSLDU_VS2_RD] = 1'b1;
       end
 
       // Bank read port 2 - Priority: VFU (D) -> VLSU
       if (read_request[bank][VFU_VD_RD]) begin
         raddr[bank][2]      = f_vreg(raddr_i[VFU_VD_RD]);
         rdata_o[VFU_VD_RD]  = rdata[bank][2];
-        rvalid_o[VFU_VD_RD] = 1'b1;//3
+        rvalid_o[VFU_VD_RD] = 1'b1;
       end else if (read_request[bank][VLSU_VD_RD]) begin
         raddr[bank][2]       = f_vreg(raddr_i[VLSU_VD_RD]);
         rdata_o[VLSU_VD_RD]  = rdata[bank][2];
-        rvalid_o[VLSU_VD_RD] = 1'b1;//5
+        rvalid_o[VLSU_VD_RD] = 1'b1;
       end
     end
   end
