@@ -184,21 +184,21 @@ package ${cfg['pkg_name']};
 endpackage
 // verilog_lint: waive-stop package-filename
 
-package fpu0_cfg_pkg;
-  import fpnew_pkg::*;
-  import spatz_cluster_pkg::*;
-
-  function automatic fpu_implementation_t with_merged_ut1
-      (input fpu_implementation_t base);
-    fpu_implementation_t tmp = base;
-    tmp.UnitTypes[1] = '{MERGED, MERGED, MERGED, MERGED, MERGED, MERGED};
-    return tmp;
-  endfunction
-
-  // Build a constant variant once
-  localparam fpu_implementation_t FPUImplementation0 =
-      with_merged_ut1(FPUImplementation[0]);
-endpackage
+//package fpu0_cfg_pkg;
+//  import fpnew_pkg::*;
+//  import spatz_cluster_pkg::*;
+//
+//  function automatic fpu_implementation_t with_merged_ut1
+//      (input fpu_implementation_t base);
+//    fpu_implementation_t tmp = base;
+//    tmp.UnitTypes[1] = '{MERGED, MERGED, MERGED, MERGED, MERGED, MERGED};
+//    return tmp;
+//  endfunction
+//
+//  // Build a constant variant once
+//  localparam fpu_implementation_t FPUImplementation0 =
+//      with_merged_ut1(FPUImplementation[0]);
+//endpackage
 
 module ${cfg['name']}_wrapper
  import ${cfg['pkg_name']}::*;
@@ -524,7 +524,6 @@ module ${cfg['name']}_wrapper
     .ICacheLineCount (${cfg['pkg_name']}::ICacheLineCount),
     .ICacheWays (${cfg['pkg_name']}::ICacheWays),
     .FPUImplementation (${cfg['pkg_name']}::FPUImplementation),
-    .FPUImplementation0 (fpu0_cfg_pkg::FPUImplementation0),
     .SnitchPMACfg (${cfg['pkg_name']}::SnitchPMACfg),
     .NumIntOutstandingLoads (NumIntOutstandingLoads),
     .NumIntOutstandingMem (NumIntOutstandingMem),

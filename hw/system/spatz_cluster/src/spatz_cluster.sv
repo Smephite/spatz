@@ -60,7 +60,6 @@ module spatz_cluster
     /// # Core-global parameters
     /// FPU configuration.
     parameter fpu_implementation_t                           FPUImplementation        [NrCores] = '{default: fpu_implementation_t'(0)},
-    parameter fpu_implementation_t                           FPUImplementation0       [NrCores] = '{default: fpu_implementation_t'(0)},
     /// Per-core enabling of the custom `Xdma` ISA extensions.
     parameter bit                              [NrCores-1:0] Xdma                               = '{default: '0},
     /// # Per-core parameters
@@ -745,7 +744,6 @@ module spatz_cluster
       .NumIntOutstandingMem    (NumIntOutstandingMem[i]    ),
       .NumSpatzOutstandingLoads(NumSpatzOutstandingLoads[i]),
       .FPUImplementation       (FPUImplementation[i]       ),
-      .FPUImplementation0      (FPUImplementation0[i]      ),
       .RegisterOffloadRsp      (RegisterOffloadRsp         ),
       .RegisterCoreReq         (RegisterCoreReq            ),
       .RegisterCoreRsp         (RegisterCoreRsp            ),

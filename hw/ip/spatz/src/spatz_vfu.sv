@@ -15,8 +15,7 @@ module spatz_vfu
   import cf_math_pkg::idx_width;
   import fpnew_pkg::*; #(
     /// FPU configuration.
-    parameter fpu_implementation_t FPUImplementation = fpu_implementation_t'(0),
-    parameter fpu_implementation_t FPUImplementation0 = fpu_implementation_t'(0)
+    parameter fpu_implementation_t FPUImplementation = fpu_implementation_t'(0)
   ) (
     input  logic             clk_i,
     input  logic             rst_ni,
@@ -1023,7 +1022,7 @@ module spatz_vfu
       
       fpnew_top #(
         .Features                   (FPUFeatures           ),
-        .Implementation             ((fpu == 0)?FPUImplementation0:FPUImplementation),
+        .Implementation             (FPUImplementation),
         // .Implementation             (FPUImplementation),
         .TagType                    (vfu_tag_t             ),
         .StochasticRndImplementation(fpnew_pkg::DEFAULT_RSR)
