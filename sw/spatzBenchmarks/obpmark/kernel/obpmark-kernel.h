@@ -16,30 +16,57 @@
 
 // Author: Matheus Cavalcante, ETH Zurich
 
-#ifndef SPFMATMUL_H
-#define SPFMATMUL_H
+#ifndef OBPMARK_KERN_H
+#define OBPMARK_KERN_H
 
-void matmul(float *c, const float *a, const float *b, const unsigned int M,
-            const unsigned int N, const unsigned int P);
+#include <stddef.h>
+#include <stdint.h>
 
-inline void matmul_single_unrolled(float *c, const float *a, const float *b,
-                                   const unsigned int N, const unsigned int P,
-                                   unsigned int vl)
-    __attribute__((always_inline));
-inline void matmul_2xVL(float *c, const float *a, const float *b,
-                        const unsigned int m_start, const unsigned int m_end,
-                        const unsigned int N, const unsigned int P,
-                        const unsigned int p_start, const unsigned int p_end)
-    __attribute__((always_inline));
-inline void matmul_4xVL(float *c, const float *a, const float *b,
-                        const unsigned int m_start, const unsigned int m_end,
-                        const unsigned int N, const unsigned int P,
-                        const unsigned int p_start, const unsigned int p_end)
-    __attribute__((always_inline));
-inline void matmul_8xVL(float *c, const float *a, const float *b,
-                        const unsigned int m_start, const unsigned int m_end,
-                        const unsigned int N, const unsigned int P,
-                        const unsigned int p_start, const unsigned int p_end)
-    __attribute__((always_inline));
+inline void f_offset(uint16_t *a, const uint16_t *b,
+    const unsigned int width, const unsigned int height,
+    const unsigned int x_start, const unsigned int x_end,
+    const unsigned int y_start, const unsigned int y_end
+  )    __attribute__((always_inline));
+
+  inline void f_coadd(uint32_t *a, const uint32_t *b,
+    const unsigned int width, const unsigned int height,
+    const unsigned int x_start, const unsigned int x_end,
+    const unsigned int y_start, const unsigned int y_end
+  )   __attribute__((always_inline));
+
+  inline void f_gain(uint16_t *a, const uint16_t *b,
+    const unsigned int width, const unsigned int height,
+    const unsigned int x_start, const unsigned int x_end,
+    const unsigned int y_start, const unsigned int y_end
+  )    __attribute__((always_inline));
+
+inline uint32_t f_neighbour_masked_sum(
+	const uint16_t *frame,
+	const uint8_t *mask,
+	int x_mid,
+	int y_mid,
+  const unsigned int width,
+  const unsigned int height
+	) __attribute__((always_inline));
+
+  inline void f_mask_replace(uint16_t *a, const uint8_t *b,
+    const unsigned int width, const unsigned int height,
+    const unsigned int x_start, const unsigned int x_end,
+    const unsigned int y_start, const unsigned int y_end
+)    __attribute__((always_inline));
+
+inline void f_scrub(uint16_t *a, uint16_t** frames,
+    unsigned int frame_i,
+    const unsigned int width, const unsigned int height,
+    const unsigned int x_start, const unsigned int x_end,
+    const unsigned int y_start, const unsigned int y_end
+)    __attribute__((always_inline));
+
+inline void f_2x2_bin(
+    uint16_t *a, uint32_t *b, uint32_t * out_buf,
+    const unsigned int width, const unsigned int height,
+    const unsigned int x_start, const unsigned int x_end,
+    const unsigned int y_start, const unsigned int y_end
+	)    __attribute__((always_inline));
 
 #endif

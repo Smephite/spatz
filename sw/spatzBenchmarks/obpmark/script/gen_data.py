@@ -43,27 +43,16 @@ def emit_header_file(layer_type: str, **kwargs):
 
     file_path = pathlib.Path(__file__).parent.parent / "data"
     emit_str = (
-        "// Copyright 2023 ETH Zurich and University of Bologna.\n"
+        "// Copyright 2025 ETH Zurich and University of Bologna.\n"
         + "// Licensed under the Apache License, Version 2.0, see LICENSE for details.\n"
         + "// SPDX-License-Identifier: Apache-2.0\n\n"
         + "// This file was generated automatically.\n\n"
     )
 
-    if layer_type == "Conv2d":
-        file = file_path / "data_conv2d.h"
-        emit_str += emit_conv2d_layer(**kwargs)
-    elif layer_type == "GEMM":
-        file = file_path / ("data_" + str(kwargs["M"]) + "_" + str(kwargs["N"]) + "_" + str(kwargs["K"]) + ".h")
-        emit_str += emit_GEMM_layer(**kwargs)
-    elif layer_type == "BatchNorm":
-        file = file_path / "data_batchnorm.h"
-        emit_str += emit_batchnorm_layer(**kwargs)
-    elif layer_type == "MaxPool":
-        file = file_path / "data_maxpool.h"
-        emit_str += emit_maxpool_layer(**kwargs)
-    elif layer_type == "FusedConv":
-        file = file_path / "data_fusedconv.h"
-        emit_str += emit_fusedconv(**kwargs)
+    file = file_path / "data_fusedconv.h"
+    emit_str += emit_fusedconv(**kwargs)
+
+
     with file.open("w") as f:
         f.write(emit_str)
 
