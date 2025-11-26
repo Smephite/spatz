@@ -25,7 +25,9 @@ void f_offset(uint16_t *a, const uint16_t *b,
     const unsigned int x_start, const unsigned int x_end,
     const unsigned int y_start, const unsigned int y_end
   ){
+  //const unsigned int cid = snrt_cluster_core_idx();
     UNUSED(height);
+
     for(unsigned int y = y_start; y < y_end; ++y) {
       int todo = x_end - x_start;
       unsigned int vl;
@@ -158,12 +160,12 @@ uint32_t f_neighbour_masked_sum(
 	{
 		for(x=x_start; x<(x_stop+1); x++)
 		{
-        //unsigned int index = (y+y_mid)*width+(x+x_mid);
+        unsigned int index = (y+y_mid)*width+(x+x_mid);
       
         /* Only include good pixels */
-        if(mask[index] == 0)
-        {
-          sum += frame[index];
+        //if(mask[index] == 0)
+        { 
+          sum += frame[x_stop];
           ++n_sum;
         }
 		}
@@ -181,11 +183,13 @@ void f_mask_replace(uint16_t *a, const uint8_t *b,
     const unsigned int x_start, const unsigned int x_end,
     const unsigned int y_start, const unsigned int y_end
 ){
+  const unsigned int cid = snrt_cluster_core_idx();
+
     UNUSED(height);
     for(unsigned int y = y_start; y < y_end; ++y) {
       for(unsigned int x = x_start; x < x_end; ++x) {
         unsigned int index = y*width+x;
-        if(b[index])
+        //if(b[index])
         {
           a[index] = f_neighbour_masked_sum(a, b, x, y, width, height);
         }
@@ -270,7 +274,7 @@ void f_2x2_bin(
 {
 
 
-	if(width != 0 || height != 0) // must be multiple of 2
+	if(width%2 != 0 || height%2 != 0) // must be multiple of 2
 		return;
 	
     for(unsigned int y = y_start; y < y_end; y+=2) {
@@ -317,10 +321,11 @@ void f_2x2_bin(
 			 );
 
 			 for(uint32_t i = 0; i < vl; ++i){
-			 	*(out_row + i) = out_buf[i*2];
+			 //	*(out_row + i) = out_buf[i*2];
 			 }
         
         x += vl;
+        out_row += x;
         todo -= vl;
       }
     }

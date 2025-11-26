@@ -1,0 +1,28 @@
+// Copyright 2025 ETH Zurich and University of Bologna.
+// Licensed under the Apache License, Version 2.0, see LICENSE for details.
+// SPDX-License-Identifier: Apache-2.0
+
+#pragma once
+#include <stdint.h>
+
+#define FRAME_W 256
+#define FRAME_H 256
+#define FRAME_NUM 1
+
+
+#define NUM_NEIGBOURS 4
+
+
+static uint16_t input_frames[FRAME_NUM+NUM_NEIGBOURS][FRAME_W*FRAME_H] __attribute__((section(".data"))) = { { 0 } };
+static uint32_t image_outputs[FRAME_NUM+NUM_NEIGBOURS][FRAME_W*FRAME_H/4] __attribute__((section(".data"))) = { 0 };
+
+static uint8_t bad_pixel_map[FRAME_W*FRAME_H] __attribute__((section(".data"))) = { 0 };
+static uint16_t offset_map[FRAME_W*FRAME_H] __attribute__((section(".data"))) = { 1 };
+static uint16_t gain_map[FRAME_W*FRAME_H] __attribute__((section(".data"))) = { 1 };
+
+static uint16_t f_offset_gm[FRAME_NUM+NUM_NEIGBOURS][FRAME_W*FRAME_H] __attribute__((section(".data"))) = { {0} };
+static uint16_t f_mask_replace_gm[FRAME_NUM+NUM_NEIGBOURS][FRAME_W*FRAME_H] __attribute__((section(".data"))) = { {0} };
+static uint16_t f_scrub_gm[FRAME_NUM+NUM_NEIGBOURS][FRAME_W*FRAME_H] __attribute__((section(".data"))) = { {0} };
+static uint16_t f_gain_gm[FRAME_NUM+NUM_NEIGBOURS][FRAME_W*FRAME_H] __attribute__((section(".data"))) = { {0} };
+static uint32_t f_2x2_bin_gm[FRAME_NUM+NUM_NEIGBOURS][FRAME_W*FRAME_H/4] __attribute__((section(".data"))) = { {0} };
+static uint32_t f_coadd_gm[FRAME_NUM+NUM_NEIGBOURS][FRAME_W*FRAME_H/4] __attribute__((section(".data")))= { {0} };
