@@ -18,8 +18,10 @@ package spatz_cluster_pkg;
   ///////////
 
   // AXI Data Width
-  localparam int unsigned SpatzAxiDataWidth = 64;
-  localparam int unsigned SpatzAxiStrbWidth = SpatzAxiDataWidth / 8;
+  localparam int unsigned SpatzAxiNarrowDataWidth = 64;
+  localparam int unsigned SpatzAxiNarrowStrbWidth = SpatzAxiNarrowDataWidth / 8;
+  localparam int unsigned SpatzAxiWideDataWidth = 512;
+  localparam int unsigned SpatzAxiWideStrbWidth = SpatzAxiWideDataWidth / 8;
   // AXI Address Width
   localparam int unsigned SpatzAxiAddrWidth = 48;
   // AXI ID Width
@@ -29,17 +31,21 @@ package spatz_cluster_pkg;
   // AXI User Width
   localparam int unsigned SpatzAxiUserWidth = 10;
 
-  typedef logic [SpatzAxiDataWidth-1:0] axi_data_t;
-  typedef logic [SpatzAxiStrbWidth-1:0] axi_strb_t;
+  typedef logic [SpatzAxiNarrowDataWidth-1:0] axi_narrow_data_t;
+  typedef logic [SpatzAxiNarrowStrbWidth-1:0] axi_narrow_strb_t;
+  typedef logic [SpatzAxiWideDataWidth-1:0] axi_wide_data_t; 
+  typedef logic [SpatzAxiWideStrbWidth-1:0] axi_wide_strb_t;
   typedef logic [SpatzAxiAddrWidth-1:0] axi_addr_t;
   typedef logic [SpatzAxiIdInWidth-1:0] axi_id_in_t;
   typedef logic [SpatzAxiIdOutWidth-1:0] axi_id_out_t;
   typedef logic [SpatzAxiUserWidth-1:0] axi_user_t;
 
 
-  `AXI_TYPEDEF_ALL(spatz_axi_in, axi_addr_t, axi_id_in_t, logic [63:0], logic [7:0], axi_user_t)
-  `AXI_TYPEDEF_ALL(spatz_axi_out, axi_addr_t, axi_id_out_t, axi_data_t, axi_strb_t, axi_user_t)
+  `AXI_TYPEDEF_ALL(spatz_axi_narrow_in, axi_addr_t, axi_id_in_t, axi_narrow_data_t, axi_narrow_strb_t, axi_user_t)
+  `AXI_TYPEDEF_ALL(spatz_axi_narrow_out, axi_addr_t, axi_id_out_t, axi_narrow_data_t, axi_narrow_strb_t, axi_user_t)
 
+  `AXI_TYPEDEF_ALL(spatz_axi_wide_in, axi_addr_t, axi_id_in_t, axi_wide_data_t, axi_wide_strb_t, axi_user_t)
+  `AXI_TYPEDEF_ALL(spatz_axi_wide_out, axi_addr_t, axi_id_out_t, axi_wide_data_t, axi_wide_strb_t, axi_user_t)
   ////////////////////
   //  Spatz Cluster //
   ////////////////////
@@ -210,17 +216,24 @@ module spatz_cluster_wrapper
  import snitch_pma_pkg::snitch_pma_t;
  #(
   parameter int unsigned AxiAddrWidth  = spatz_cluster_pkg::SpatzAxiAddrWidth,
-  parameter int unsigned AxiDataWidth  = spatz_cluster_pkg::SpatzAxiDataWidth,
+  parameter int unsigned AxiNarrowDataWidth  = spatz_cluster_pkg::SpatzAxiNarrowDataWidth,
+  parameter int unsigned AxiWideDataWidth  = spatz_cluster_pkg::SpatzAxiWideDataWidth,
   parameter int unsigned AxiUserWidth  = spatz_cluster_pkg::SpatzAxiUserWidth,
   parameter int unsigned AxiInIdWidth  = spatz_cluster_pkg::SpatzAxiIdInWidth,
   parameter int unsigned AxiOutIdWidth = spatz_cluster_pkg::SpatzAxiIdOutWidth,
   parameter int unsigned IwcAxiIdOutWidth = 3,
 
-  parameter type axi_in_resp_t = spatz_axi_in_resp_t,
-  parameter type axi_in_req_t  = spatz_axi_in_req_t,
+  parameter type axi_wide_in_resp_t = spatz_axi_wide_in_resp_t,
+  parameter type axi_wide_in_req_t  = spatz_axi_wide_in_req_t,
 
-  parameter type axi_out_resp_t = spatz_axi_out_resp_t,
-  parameter type axi_out_req_t  = spatz_axi_out_req_t
+  parameter type axi_wide_out_resp_t = spatz_axi_wide_out_resp_t,
+  parameter type axi_wide_out_req_t  = spatz_axi_wide_out_req_t,
+
+  parameter type axi_narrow_in_resp_t = spatz_axi_narrow_in_resp_t,
+  parameter type axi_narrow_in_req_t  = spatz_axi_narrow_in_req_t,
+
+  parameter type axi_narrow_out_resp_t = spatz_axi_narrow_out_resp_t,
+  parameter type axi_narrow_out_req_t  = spatz_axi_narrow_out_req_t
 )(
   input  logic                clk_i,
   input  logic                rst_ni,
@@ -233,10 +246,16 @@ module spatz_cluster_wrapper
   input  logic [AxiAddrWidth-1:0]       cluster_base_addr_i,
   input  logic [AxiUserWidth-1:0]       axi_core_default_user_i,
   output logic                          cluster_probe_o,
-  input  axi_in_req_t   axi_in_req_i,
-  output axi_in_resp_t  axi_in_resp_o,
-  output axi_out_req_t  axi_out_req_o,
-  input  axi_out_resp_t axi_out_resp_i
+
+  input  axi_narrow_in_req_t   axi_narrow_in_req_i,
+  output axi_narrow_in_resp_t  axi_narrow_in_resp_o,
+  output axi_narrow_out_req_t  axi_narrow_out_req_o,
+  input  axi_narrow_out_resp_t axi_narrow_out_resp_i,
+
+  input  axi_wide_in_req_t     axi_wide_in_req_i,
+  output axi_wide_in_resp_t    axi_wide_in_resp_o,
+  output axi_wide_out_req_t    axi_wide_out_req_o,
+  input  axi_wide_out_resp_t   axi_wide_out_resp_i
 );
 
   localparam int unsigned NumIntOutstandingLoads   [NumCores] = '{1, 1};
@@ -247,13 +266,14 @@ module spatz_cluster_wrapper
 
   typedef logic [IwcAxiIdOutWidth-1:0] axi_id_out_iwc_t;
 
-  `AXI_TYPEDEF_ALL(spatz_axi_iwc_out, axi_addr_t, axi_id_out_iwc_t, axi_data_t, axi_strb_t, axi_user_t)
+  `AXI_TYPEDEF_ALL(spatz_axi_wide_iwc_out, axi_addr_t, axi_id_out_iwc_t, axi_wide_data_t, axi_wide_strb_t, axi_user_t)
+  `AXI_TYPEDEF_ALL(spatz_axi_narrow_iwc_out, axi_addr_t, axi_id_out_iwc_t, axi_narrow_data_t, axi_narrow_strb_t, axi_user_t)
 
-  spatz_axi_iwc_out_req_t axi_from_cluster_iwc_req;
-  spatz_axi_iwc_out_resp_t axi_from_cluster_iwc_resp;
+  spatz_axi_wide_iwc_out_req_t axi_wide_from_cluster_iwc_req;
+  spatz_axi_wide_iwc_out_resp_t axi_wide_from_cluster_iwc_resp;
 
-
-
+  spatz_axi_narrow_iwc_out_req_t axi_narrow_from_cluster_iwc_req;
+  spatz_axi_narrow_iwc_out_resp_t axi_narrow_from_cluster_iwc_resp;
 
   axi_iw_converter #(
     .AxiSlvPortIdWidth ( IwcAxiIdOutWidth ),
@@ -264,25 +284,50 @@ module spatz_cluster_wrapper
     .AxiMstPortMaxUniqIds (2),
     .AxiMstPortMaxTxnsPerId (4),
     .AxiAddrWidth ( AxiAddrWidth ),
-    .AxiDataWidth ( AxiDataWidth ),
+    .AxiDataWidth ( AxiWideDataWidth ),
     .AxiUserWidth ( AxiUserWidth ),
-    .slv_req_t  (spatz_axi_iwc_out_req_t),
-    .slv_resp_t (spatz_axi_iwc_out_resp_t),
-    .mst_req_t  ( axi_out_req_t),
-    .mst_resp_t ( axi_out_resp_t)
-  ) iw_converter(
+    .slv_req_t  (spatz_axi_wide_iwc_out_req_t),
+    .slv_resp_t (spatz_axi_wide_iwc_out_resp_t),
+    .mst_req_t  ( axi_wide_out_req_t),
+    .mst_resp_t ( axi_wide_out_resp_t)
+  ) iw_wide_converter(
     .clk_i      ( clk_i  ),
     .rst_ni     ( rst_ni ),
-    .slv_req_i  ( axi_from_cluster_iwc_req  ),
-    .slv_resp_o ( axi_from_cluster_iwc_resp ),
-    .mst_req_o  ( axi_out_req_o  ),
-    .mst_resp_i ( axi_out_resp_i )
+    .slv_req_i  ( axi_wide_from_cluster_iwc_req  ),
+    .slv_resp_o ( axi_wide_from_cluster_iwc_resp ),
+    .mst_req_o  ( axi_wide_out_req_o  ),
+    .mst_resp_i ( axi_wide_out_resp_i )
+   );
+
+    axi_iw_converter #(
+    .AxiSlvPortIdWidth ( IwcAxiIdOutWidth ),
+    .AxiMstPortIdWidth ( AxiOutIdWidth ),
+    .AxiSlvPortMaxUniqIds ( 2 ),
+    .AxiSlvPortMaxTxnsPerId (2),
+    .AxiSlvPortMaxTxns (4),
+    .AxiMstPortMaxUniqIds (2),
+    .AxiMstPortMaxTxnsPerId (4),
+    .AxiAddrWidth ( AxiAddrWidth ),
+    .AxiDataWidth ( AxiNarrowDataWidth ),
+    .AxiUserWidth ( AxiUserWidth ),
+    .slv_req_t  (spatz_axi_narrow_iwc_out_req_t),
+    .slv_resp_t (spatz_axi_narrow_iwc_out_resp_t),
+    .mst_req_t  ( axi_narrow_out_req_t),
+    .mst_resp_t ( axi_narrow_out_resp_t)
+    ) iw_narrow_converter(
+    .clk_i      ( clk_i  ),
+    .rst_ni     ( rst_ni ),
+    .slv_req_i  ( axi_narrow_from_cluster_iwc_req  ),
+    .slv_resp_o ( axi_narrow_from_cluster_iwc_resp ),
+    .mst_req_o  ( axi_narrow_out_req_o  ),
+    .mst_resp_i ( axi_narrow_out_resp_i )
    );
 
   // Spatz cluster under test.
   spatz_cluster #(
     .AxiAddrWidth (AxiAddrWidth),
-    .AxiDataWidth (AxiDataWidth),
+    .AxiWideDataWidth (AxiWideDataWidth),
+    .AxiNarrowDataWidth (AxiNarrowDataWidth),
     .AxiIdWidthIn (AxiInIdWidth),
     .AxiIdWidthOut (IwcAxiIdOutWidth),
     .AxiUserWidth (AxiUserWidth),
@@ -301,10 +346,14 @@ module spatz_cluster_wrapper
     .NumSpatzOutstandingLoads (NumSpatzOutstandingLoads),
     .NumSpatzFPUs (NumSpatzFPUs),
     .NumSpatzIPUs (NumSpatzIPUs),
-    .axi_in_req_t (axi_in_req_t),
-    .axi_in_resp_t (axi_in_resp_t),
-    .axi_out_req_t (spatz_axi_iwc_out_req_t),
-    .axi_out_resp_t (spatz_axi_iwc_out_resp_t),
+    .axi_wide_in_req_t (axi_wide_in_req_t),
+    .axi_wide_in_resp_t (axi_wide_in_resp_t),
+    .axi_wide_out_req_t (spatz_axi_wide_iwc_out_req_t),
+    .axi_wide_out_resp_t (spatz_axi_wide_iwc_out_resp_t),
+    .axi_narrow_in_req_t (axi_narrow_in_req_t),
+    .axi_narrow_in_resp_t (axi_narrow_in_resp_t),
+    .axi_narrow_out_req_t (spatz_axi_narrow_iwc_out_req_t),
+    .axi_narrow_out_resp_t (spatz_axi_narrow_iwc_out_resp_t),
     .Xdma (2'b01),
     .DMAAxiReqFifoDepth (24),
     .DMAReqFifoDepth (8),
@@ -312,7 +361,8 @@ module spatz_cluster_wrapper
     .RegisterCoreReq (1),
     .RegisterCoreRsp (1),
     .RegisterTCDMCuts (1),
-    .RegisterExt (0),
+    .RegisterExtNarrow (0),
+    .RegisterExtWide (0),
     .XbarLatency (axi_pkg::CUT_ALL_PORTS),
     .MaxMstTrans (4),
     .MaxSlvTrans (4)
@@ -327,11 +377,15 @@ module spatz_cluster_wrapper
     .cluster_base_addr_i,
     .axi_core_default_user_i,
     .cluster_probe_o,
-    .axi_in_req_i,
-    .axi_in_resp_o,
+    .axi_wide_in_req_i,
+    .axi_wide_in_resp_o,
+    .axi_narrow_in_req_i,
+    .axi_narrow_in_resp_o,
     // AXI Master Port
-    .axi_out_req_o  ( axi_from_cluster_iwc_req ),
-    .axi_out_resp_i ( axi_from_cluster_iwc_resp )
+    .axi_wide_out_req_o  ( axi_wide_from_cluster_iwc_req ),
+    .axi_wide_out_resp_i ( axi_wide_from_cluster_iwc_resp ),
+    .axi_narrow_out_req_o  ( axi_narrow_from_cluster_iwc_req ),
+    .axi_narrow_out_resp_i ( axi_narrow_from_cluster_iwc_resp )
   );
 
 endmodule

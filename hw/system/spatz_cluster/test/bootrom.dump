@@ -82,7 +82,12 @@ Disassembly of section .rodata:
     10fe:	0000                	unimp
     1100:	0000                	unimp
     1102:	0002                	0x2
-	...
+    1104:	0000                	unimp
+    1106:	0000                	unimp
+    1108:	0000                	unimp
+    110a:	0004                	addi	s1,sp,0
+    110c:	0000                	unimp
+    110e:	0000                	unimp
     1110:	0000                	unimp
     1112:	7000                	flw	fs0,32(s0)
     1114:	0000                	unimp
