@@ -52,6 +52,7 @@ module testharness (
     .msip_i          ('0                   ),
     .mtip_i          ('0                   ),
     .debug_req_i     ( debug_req           ),
+
     .axi_narrow_out_req_o   (axi_narrow_from_cluster_req ),
     .axi_narrow_out_resp_i  (axi_narrow_from_cluster_resp),
     .axi_narrow_in_req_i    (axi_narrow_to_cluster_req   ),
@@ -61,7 +62,6 @@ module testharness (
     .axi_wide_out_resp_i  (axi_wide_from_cluster_resp),
     .axi_wide_in_req_i    (axi_wide_to_cluster_req   ),
     .axi_wide_in_resp_o   (axi_wide_to_cluster_resp  ),
-
     .cluster_probe_o (cluster_probe        )
   );
 /**************
@@ -188,5 +188,8 @@ module testharness (
     .req_i (axi_wide_from_cluster_req ),
     .rsp_o (axi_wide_from_cluster_resp)
   );
+
+  assign axi_wide_to_cluster_req   = '0;
+  assign axi_narrow_from_cluster_resp = '0;
 
 endmodule : testharness

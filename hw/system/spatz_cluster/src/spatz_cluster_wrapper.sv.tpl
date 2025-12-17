@@ -34,8 +34,10 @@ package ${cfg['pkg_name']};
   ///////////
 
   // AXI Data Width
-  localparam int unsigned SpatzAxiDataWidth = ${cfg['dma_data_width']};
-  localparam int unsigned SpatzAxiStrbWidth = SpatzAxiDataWidth / 8;
+  localparam int unsigned SpatzAxiNarrowDataWidth = ${cfg['data_width']};
+  localparam int unsigned SpatzAxiNarrowStrbWidth = SpatzAxiNarrowDataWidth / 8;
+  localparam int unsigned SpatzAxiWideDataWidth = ${cfg['dma_data_width']};
+  localparam int unsigned SpatzAxiWideStrbWidth = SpatzAxiWideDataWidth / 8;
   // AXI Address Width
   localparam int unsigned SpatzAxiAddrWidth = ${cfg['addr_width']};
   // AXI ID Width
@@ -45,8 +47,10 @@ package ${cfg['pkg_name']};
   // AXI User Width
   localparam int unsigned SpatzAxiUserWidth = ${cfg['user_width']};
 
-  typedef logic [SpatzAxiDataWidth-1:0] axi_data_t;
-  typedef logic [SpatzAxiStrbWidth-1:0] axi_strb_t;
+  typedef logic [SpatzAxiNarrowDataWidth-1:0] axi_narrow_data_t;
+  typedef logic [SpatzAxiNarrowStrbWidth-1:0] axi_narrow_strb_t;
+  typedef logic [SpatzAxiWideDataWidth-1:0] axi_wide_data_t; 
+  typedef logic [SpatzAxiWideStrbWidth-1:0] axi_wide_strb_t;
   typedef logic [SpatzAxiAddrWidth-1:0] axi_addr_t;
   typedef logic [SpatzAxiIdInWidth-1:0] axi_id_in_t;
   typedef logic [SpatzAxiIdOutWidth-1:0] axi_id_out_t;
@@ -60,8 +64,11 @@ package ${cfg['pkg_name']};
   % endif
 % endif
 
-  `AXI_TYPEDEF_ALL(spatz_axi_in, axi_addr_t, axi_id_in_t, logic [63:0], logic [7:0], axi_user_t)
-  `AXI_TYPEDEF_ALL(spatz_axi_out, axi_addr_t, axi_id_out_t, axi_data_t, axi_strb_t, axi_user_t)
+  `AXI_TYPEDEF_ALL(spatz_axi_narrow_in, axi_addr_t, axi_id_in_t, axi_narrow_data_t, axi_narrow_strb_t, axi_user_t)
+  `AXI_TYPEDEF_ALL(spatz_axi_narrow_out, axi_addr_t, axi_id_out_t, axi_narrow_data_t, axi_narrow_strb_t, axi_user_t)
+
+  `AXI_TYPEDEF_ALL(spatz_axi_wide_in, axi_addr_t, axi_id_in_t, axi_wide_data_t, axi_wide_strb_t, axi_user_t)
+  `AXI_TYPEDEF_ALL(spatz_axi_wide_out, axi_addr_t, axi_id_out_t, axi_wide_data_t, axi_wide_strb_t, axi_user_t)
 
   ////////////////////
   //  Spatz Cluster //
@@ -183,11 +190,12 @@ module ${cfg['name']}_wrapper
  import fpnew_pkg::fpu_implementation_t;
  import snitch_pma_pkg::snitch_pma_t;
  #(
-  parameter int unsigned AxiAddrWidth  = ${cfg['pkg_name']}::SpatzAxiAddrWidth,
-  parameter int unsigned AxiDataWidth  = ${cfg['pkg_name']}::SpatzAxiDataWidth,
-  parameter int unsigned AxiUserWidth  = ${cfg['pkg_name']}::SpatzAxiUserWidth,
-  parameter int unsigned AxiInIdWidth  = ${cfg['pkg_name']}::SpatzAxiIdInWidth,
-  parameter int unsigned AxiOutIdWidth = ${cfg['pkg_name']}::SpatzAxiIdOutWidth,
+  parameter int unsigned AxiAddrWidth        = ${cfg['pkg_name']}::SpatzAxiAddrWidth,
+  parameter int unsigned AxiNarrowDataWidth  = ${cfg['pkg_name']}::SpatzAxiNarrowDataWidth,
+  parameter int unsigned AxiWideDataWidth    = ${cfg['pkg_name']}::SpatzAxiWideDataWidth,
+  parameter int unsigned AxiUserWidth        = ${cfg['pkg_name']}::SpatzAxiUserWidth,
+  parameter int unsigned AxiInIdWidth        = ${cfg['pkg_name']}::SpatzAxiIdInWidth,
+  parameter int unsigned AxiOutIdWidth       = ${cfg['pkg_name']}::SpatzAxiIdOutWidth,
   parameter int unsigned IwcAxiIdOutWidth = 3,
 % if cfg['axi_isolate_enable']:
   parameter int unsigned AxiMaxOutTrans = ${cfg['trans']},
@@ -200,8 +208,8 @@ module ${cfg['name']}_wrapper
   % endif
 % endif
 
-  parameter type axi_in_resp_t = spatz_axi_in_resp_t,
-  parameter type axi_in_req_t  = spatz_axi_in_req_t,
+  parameter type axi_wide_in_resp_t = spatz_axi_wide_in_resp_t,
+  parameter type axi_wide_in_req_t  = spatz_axi_wide_in_req_t,
 % if cfg['axi_cdc_enable']:
   parameter type axi_in_aw_chan_t = spatz_axi_in_aw_chan_t,
   parameter type axi_in_w_chan_t  = spatz_axi_in_w_chan_t,
@@ -210,7 +218,7 @@ module ${cfg['name']}_wrapper
   parameter type axi_in_r_chan_t  = spatz_axi_in_r_chan_t,
 % endif
 
-  parameter type axi_out_resp_t = spatz_axi_out_resp_t,
+  parameter type axi_wide_out_resp_t = spatz_axi_wide_out_resp_t,
 % if cfg['axi_cdc_enable']:
   parameter type axi_out_req_t  = spatz_axi_out_req_t,
 
@@ -234,7 +242,12 @@ module ${cfg['name']}_wrapper
   parameter int unsigned AsyncAxiInArWidth = (2**LogDepth) * axi_pkg::ar_width(SpatzAxiAddrWidth, SpatzAxiIdInWidth, SpatzAxiUserWidth),
   parameter int unsigned AsyncAxiInRWidth  = (2**LogDepth) * axi_pkg::r_width (SpatzAxiDataWidth, SpatzAxiIdInWidth, SpatzAxiUserWidth)
 % else:
-  parameter type axi_out_req_t  = spatz_axi_out_req_t
+  parameter type axi_wide_out_req_t  = spatz_axi_wide_out_req_t,
+
+  parameter type axi_narrow_in_resp_t  = spatz_axi_narrow_in_resp_t,
+  parameter type axi_narrow_in_req_t   = spatz_axi_narrow_in_req_t,
+  parameter type axi_narrow_out_resp_t = spatz_axi_narrow_out_resp_t,
+  parameter type axi_narrow_out_req_t  = spatz_axi_narrow_out_req_t
 % endif
 )(
   input  logic                clk_i,
@@ -295,10 +308,15 @@ module ${cfg['name']}_wrapper
   input  logic [LogDepth:0]            async_axi_in_w_wptr_i,
   output logic [LogDepth:0]            async_axi_in_w_rptr_o
 %else:
-  input  axi_in_req_t   axi_in_req_i,
-  output axi_in_resp_t  axi_in_resp_o,
-  output axi_out_req_t  axi_out_req_o,
-  input  axi_out_resp_t axi_out_resp_i
+  input  axi_narrow_in_req_t   axi_narrow_in_req_i,
+  output axi_narrow_in_resp_t  axi_narrow_in_resp_o,
+  output axi_narrow_out_req_t  axi_narrow_out_req_o,
+  input  axi_narrow_out_resp_t axi_narrow_out_resp_i,
+
+  input  axi_wide_in_req_t     axi_wide_in_req_i,
+  output axi_wide_in_resp_t    axi_wide_in_resp_o,
+  output axi_wide_out_req_t    axi_wide_out_req_o,
+  input  axi_wide_out_resp_t   axi_wide_out_resp_i
 % endif
 );
 
@@ -308,12 +326,17 @@ module ${cfg['name']}_wrapper
   localparam int unsigned NumSpatzFPUs             [NumCores] = '{default: ${cfg['n_fpu']}};
   localparam int unsigned NumSpatzIPUs             [NumCores] = '{default: ${cfg['n_ipu']}};
 
+
   typedef logic [IwcAxiIdOutWidth-1:0] axi_id_out_iwc_t;
 
-  `AXI_TYPEDEF_ALL(spatz_axi_iwc_out, axi_addr_t, axi_id_out_iwc_t, axi_data_t, axi_strb_t, axi_user_t)
+  `AXI_TYPEDEF_ALL(spatz_axi_wide_iwc_out, axi_addr_t, axi_id_out_iwc_t, axi_wide_data_t, axi_wide_strb_t, axi_user_t)
+  `AXI_TYPEDEF_ALL(spatz_axi_narrow_iwc_out, axi_addr_t, axi_id_out_iwc_t, axi_narrow_data_t, axi_narrow_strb_t, axi_user_t)
 
-  spatz_axi_iwc_out_req_t axi_from_cluster_iwc_req;
-  spatz_axi_iwc_out_resp_t axi_from_cluster_iwc_resp;
+  spatz_axi_wide_iwc_out_req_t axi_wide_from_cluster_iwc_req;
+  spatz_axi_wide_iwc_out_resp_t axi_wide_from_cluster_iwc_resp;
+
+  spatz_axi_narrow_iwc_out_req_t axi_narrow_from_cluster_iwc_req;
+  spatz_axi_narrow_iwc_out_resp_t axi_narrow_from_cluster_iwc_resp;
 
 % if cfg['axi_isolate_enable'] or cfg['axi_cdc_enable']:
   axi_out_req_t  axi_from_cluster_req;
@@ -458,6 +481,7 @@ module ${cfg['name']}_wrapper
   );
 % endif
 
+ 
   axi_iw_converter #(
     .AxiSlvPortIdWidth ( IwcAxiIdOutWidth ),
     .AxiMstPortIdWidth ( AxiOutIdWidth ),
@@ -467,30 +491,50 @@ module ${cfg['name']}_wrapper
     .AxiMstPortMaxUniqIds (2),
     .AxiMstPortMaxTxnsPerId (${cfg['trans']}),
     .AxiAddrWidth ( AxiAddrWidth ),
-    .AxiDataWidth ( AxiDataWidth ),
+    .AxiDataWidth ( AxiWideDataWidth ),
     .AxiUserWidth ( AxiUserWidth ),
-    .slv_req_t  (spatz_axi_iwc_out_req_t),
-    .slv_resp_t (spatz_axi_iwc_out_resp_t),
-    .mst_req_t  ( axi_out_req_t),
-    .mst_resp_t ( axi_out_resp_t)
-  ) iw_converter(
+    .slv_req_t  (spatz_axi_wide_iwc_out_req_t),
+    .slv_resp_t (spatz_axi_wide_iwc_out_resp_t),
+    .mst_req_t  ( axi_wide_out_req_t),
+    .mst_resp_t ( axi_wide_out_resp_t)
+  ) iw_wide_converter(
     .clk_i      ( clk_i  ),
     .rst_ni     ( rst_ni ),
-    .slv_req_i  ( axi_from_cluster_iwc_req  ),
-    .slv_resp_o ( axi_from_cluster_iwc_resp ),
-% if cfg['axi_cdc_enable'] or cfg['axi_isolate_enable']:
-    .mst_req_o  ( axi_from_cluster_req  ),
-    .mst_resp_i ( axi_from_cluster_resp )
-% else:
-    .mst_req_o  ( axi_out_req_o  ),
-    .mst_resp_i ( axi_out_resp_i )
-% endif
+    .slv_req_i  ( axi_wide_from_cluster_iwc_req  ),
+    .slv_resp_o ( axi_wide_from_cluster_iwc_resp ),
+    .mst_req_o  ( axi_wide_out_req_o  ),
+    .mst_resp_i ( axi_wide_out_resp_i )
+   );
+
+    axi_iw_converter #(
+    .AxiSlvPortIdWidth ( IwcAxiIdOutWidth ),
+    .AxiMstPortIdWidth ( AxiOutIdWidth ),
+    .AxiSlvPortMaxUniqIds ( 2 ),
+    .AxiSlvPortMaxTxnsPerId (2),
+    .AxiSlvPortMaxTxns (${cfg['trans']}),
+    .AxiMstPortMaxUniqIds (2),
+    .AxiMstPortMaxTxnsPerId (${cfg['trans']}),
+    .AxiAddrWidth ( AxiAddrWidth ),
+    .AxiDataWidth ( AxiNarrowDataWidth ),
+    .AxiUserWidth ( AxiUserWidth ),
+    .slv_req_t  (spatz_axi_narrow_iwc_out_req_t),
+    .slv_resp_t (spatz_axi_narrow_iwc_out_resp_t),
+    .mst_req_t  ( axi_narrow_out_req_t),
+    .mst_resp_t ( axi_narrow_out_resp_t)
+    ) iw_narrow_converter(
+    .clk_i      ( clk_i  ),
+    .rst_ni     ( rst_ni ),
+    .slv_req_i  ( axi_narrow_from_cluster_iwc_req  ),
+    .slv_resp_o ( axi_narrow_from_cluster_iwc_resp ),
+    .mst_req_o  ( axi_narrow_out_req_o  ),
+    .mst_resp_i ( axi_narrow_out_resp_i )
    );
 
   // Spatz cluster under test.
   spatz_cluster #(
     .AxiAddrWidth (AxiAddrWidth),
-    .AxiDataWidth (AxiDataWidth),
+    .AxiWideDataWidth (AxiWideDataWidth),
+    .AxiNarrowDataWidth (AxiNarrowDataWidth),
     .AxiIdWidthIn (AxiInIdWidth),
     .AxiIdWidthOut (IwcAxiIdOutWidth),
     .AxiUserWidth (AxiUserWidth),
@@ -509,10 +553,14 @@ module ${cfg['name']}_wrapper
     .NumSpatzOutstandingLoads (NumSpatzOutstandingLoads),
     .NumSpatzFPUs (NumSpatzFPUs),
     .NumSpatzIPUs (NumSpatzIPUs),
-    .axi_in_req_t (axi_in_req_t),
-    .axi_in_resp_t (axi_in_resp_t),
-    .axi_out_req_t (spatz_axi_iwc_out_req_t),
-    .axi_out_resp_t (spatz_axi_iwc_out_resp_t),
+    .axi_wide_in_req_t (axi_wide_in_req_t),
+    .axi_wide_in_resp_t (axi_wide_in_resp_t),
+    .axi_wide_out_req_t (spatz_axi_wide_iwc_out_req_t),
+    .axi_wide_out_resp_t (spatz_axi_wide_iwc_out_resp_t),
+    .axi_narrow_in_req_t (axi_narrow_in_req_t),
+    .axi_narrow_in_resp_t (axi_narrow_in_resp_t),
+    .axi_narrow_out_req_t (spatz_axi_narrow_iwc_out_req_t),
+    .axi_narrow_out_resp_t (spatz_axi_narrow_iwc_out_resp_t),
     .Xdma (${core_cfg_flat('xdma')}),
     .DMAAxiReqFifoDepth (${cfg['dma_axi_req_fifo_depth']}),
     .DMAReqFifoDepth (${cfg['dma_req_fifo_depth']}),
@@ -520,7 +568,8 @@ module ${cfg['name']}_wrapper
     .RegisterCoreReq (${int(cfg['timing']['register_core_req'])}),
     .RegisterCoreRsp (${int(cfg['timing']['register_core_rsp'])}),
     .RegisterTCDMCuts (${int(cfg['timing']['register_tcdm_cuts'])}),
-    .RegisterExt (${int(cfg['timing']['register_ext'])}),
+    .RegisterExtNarrow (${int(cfg['timing']['register_ext'])}),
+    .RegisterExtWide (${int(cfg['timing']['register_ext'])}),
     .XbarLatency (axi_pkg::${cfg['timing']['xbar_latency']}),
     .MaxMstTrans (${cfg['trans']}),
     .MaxSlvTrans (${cfg['trans']})
@@ -550,12 +599,16 @@ module ${cfg['name']}_wrapper
     .axi_in_req_i   ( axi_to_cluster_req  ),
     .axi_in_resp_o  ( axi_to_cluster_resp ),
 % else:
-    .axi_in_req_i,
-    .axi_in_resp_o,
+    .axi_wide_in_req_i,
+    .axi_wide_in_resp_o,
+    .axi_narrow_in_req_i,
+    .axi_narrow_in_resp_o,
 % endif
     // AXI Master Port
-    .axi_out_req_o  ( axi_from_cluster_iwc_req ),
-    .axi_out_resp_i ( axi_from_cluster_iwc_resp )
+    .axi_wide_out_req_o  ( axi_wide_from_cluster_iwc_req ),
+    .axi_wide_out_resp_i ( axi_wide_from_cluster_iwc_resp ),
+    .axi_narrow_out_req_o  ( axi_narrow_from_cluster_iwc_req ),
+    .axi_narrow_out_resp_i ( axi_narrow_from_cluster_iwc_resp )
   );
 
 endmodule

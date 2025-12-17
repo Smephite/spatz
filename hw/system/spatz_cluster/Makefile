@@ -90,11 +90,12 @@ test/bootrom.elf test/bootrom.dump test/bootrom.bin: src/generated/spatz_cluster
 bootrom: $(CURDIR)/src/generated/bootrom.sv
 $(CURDIR)/src/generated/bootrom.sv: test/bootrom.bin
 	${PYTHON} $(SPATZ_DIR)/util/generate_bootrom.py test/bootrom.bin -c ${SPATZ_CLUSTER_CFG_PATH} --output src/generated/bootrom.sv
+#	${PYTHON} $(SPATZ_DIR)/util/generate_bootrom_new.py --sv-module spatz_bootrom test/bootrom.bin > src/generated/bootrom.sv
 
 .PHONY: generate
 generate: src/generated/spatz_cluster_wrapper.sv
 src/generated/spatz_cluster_wrapper.sv: ${SPATZ_CLUSTER_CFG_PATH} $(find src/tpl) $(find test/*tpl)
-#	${PYTHON} ${SPATZ_DIR}/util/clustergen.py -c ${SPATZ_CLUSTER_CFG_PATH} -o src/
+	${PYTHON} ${SPATZ_DIR}/util/clustergen.py -c ${SPATZ_CLUSTER_CFG_PATH} -o src/
 
 #############
 # Verilator #

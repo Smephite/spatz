@@ -23,13 +23,13 @@ package spatz_cluster_pkg;
   localparam int unsigned SpatzAxiWideDataWidth = 512;
   localparam int unsigned SpatzAxiWideStrbWidth = SpatzAxiWideDataWidth / 8;
   // AXI Address Width
-  localparam int unsigned SpatzAxiAddrWidth = 48;
+  localparam int unsigned SpatzAxiAddrWidth = 32;
   // AXI ID Width
-  localparam int unsigned SpatzAxiIdInWidth = 6;
-  localparam int unsigned SpatzAxiIdOutWidth = 2;
+  localparam int unsigned SpatzAxiIdInWidth = 2;
+  localparam int unsigned SpatzAxiIdOutWidth = 4;
 
   // AXI User Width
-  localparam int unsigned SpatzAxiUserWidth = 10;
+  localparam int unsigned SpatzAxiUserWidth = 2;
 
   typedef logic [SpatzAxiNarrowDataWidth-1:0] axi_narrow_data_t;
   typedef logic [SpatzAxiNarrowStrbWidth-1:0] axi_narrow_strb_t;
@@ -46,6 +46,7 @@ package spatz_cluster_pkg;
 
   `AXI_TYPEDEF_ALL(spatz_axi_wide_in, axi_addr_t, axi_id_in_t, axi_wide_data_t, axi_wide_strb_t, axi_user_t)
   `AXI_TYPEDEF_ALL(spatz_axi_wide_out, axi_addr_t, axi_id_out_t, axi_wide_data_t, axi_wide_strb_t, axi_user_t)
+
   ////////////////////
   //  Spatz Cluster //
   ////////////////////
@@ -56,21 +57,21 @@ package spatz_cluster_pkg;
   localparam int unsigned BeWidth    = DataWidth / 8;
   localparam int unsigned ByteOffset = $clog2(BeWidth);
 
-  localparam int unsigned ICacheLineWidth = 128;
-  localparam int unsigned ICacheLineCount = 128;
+  localparam int unsigned ICacheLineWidth = 256;
+  localparam int unsigned ICacheLineCount = 64;
   localparam int unsigned ICacheWays = 2;
 
-  localparam int unsigned TCDMStartAddr = 48'h20000000;
-  localparam int unsigned TCDMSize      = 48'h20000;
+  localparam int unsigned TCDMStartAddr = 32'h100000;
+  localparam int unsigned TCDMSize      = 32'h20000;
 
   localparam int unsigned PeriStartAddr = TCDMStartAddr + TCDMSize;
 
-  localparam int unsigned BootAddr      = 48'h1000;
+  localparam int unsigned BootAddr      = 32'h1000;
 
   function automatic snitch_pma_pkg::rule_t [snitch_pma_pkg::NrMaxRules-1:0] get_cached_regions();
     automatic snitch_pma_pkg::rule_t [snitch_pma_pkg::NrMaxRules-1:0] cached_regions;
     cached_regions = '{default: '0};
-    cached_regions[0] = '{base: 48'h70000000, mask: 48'hfffff0000000};
+    cached_regions[0] = '{base: 32'h80000000, mask: 32'h80000000};
     return cached_regions;
   endfunction
 
@@ -84,11 +85,11 @@ package spatz_cluster_pkg;
     '{
         PipeRegs: // FMA Block
                   '{
-                    '{  2, // FP32
-                        4, // FP64
-                        1, // FP16
+                    '{  1, // FP32
+                        2, // FP64
+                        0, // FP16
                         0, // FP8
-                        1, // FP16alt
+                        0, // FP16alt
                         0  // FP8alt
                       },
                     '{1, 1, 1, 1, 1, 1},   // DIVSQRT
@@ -104,12 +105,12 @@ package spatz_cluster_pkg;
                       2,
                       2,
                       2},   // CONV
-                    '{4,
-                      4,
-                      4,
-                      4,
-                      4,
-                      4}    // DOTP
+                    '{2,
+                      2,
+                      2,
+                      2,
+                      2,
+                      2}    // DOTP
                     },
         UnitTypes: '{'{fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED,
@@ -146,11 +147,11 @@ package spatz_cluster_pkg;
     '{
         PipeRegs: // FMA Block
                   '{
-                    '{  2, // FP32
-                        4, // FP64
-                        1, // FP16
+                    '{  1, // FP32
+                        2, // FP64
+                        0, // FP16
                         0, // FP8
-                        1, // FP16alt
+                        0, // FP16alt
                         0  // FP8alt
                       },
                     '{1, 1, 1, 1, 1, 1},   // DIVSQRT
@@ -166,12 +167,12 @@ package spatz_cluster_pkg;
                       2,
                       2,
                       2},   // CONV
-                    '{4,
-                      4,
-                      4,
-                      4,
-                      4,
-                      4}    // DOTP
+                    '{2,
+                      2,
+                      2,
+                      2,
+                      2,
+                      2}    // DOTP
                     },
         UnitTypes: '{'{fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED,
@@ -215,12 +216,12 @@ module spatz_cluster_wrapper
  import fpnew_pkg::fpu_implementation_t;
  import snitch_pma_pkg::snitch_pma_t;
  #(
-  parameter int unsigned AxiAddrWidth  = spatz_cluster_pkg::SpatzAxiAddrWidth,
+  parameter int unsigned AxiAddrWidth        = spatz_cluster_pkg::SpatzAxiAddrWidth,
   parameter int unsigned AxiNarrowDataWidth  = spatz_cluster_pkg::SpatzAxiNarrowDataWidth,
-  parameter int unsigned AxiWideDataWidth  = spatz_cluster_pkg::SpatzAxiWideDataWidth,
-  parameter int unsigned AxiUserWidth  = spatz_cluster_pkg::SpatzAxiUserWidth,
-  parameter int unsigned AxiInIdWidth  = spatz_cluster_pkg::SpatzAxiIdInWidth,
-  parameter int unsigned AxiOutIdWidth = spatz_cluster_pkg::SpatzAxiIdOutWidth,
+  parameter int unsigned AxiWideDataWidth    = spatz_cluster_pkg::SpatzAxiWideDataWidth,
+  parameter int unsigned AxiUserWidth        = spatz_cluster_pkg::SpatzAxiUserWidth,
+  parameter int unsigned AxiInIdWidth        = spatz_cluster_pkg::SpatzAxiIdInWidth,
+  parameter int unsigned AxiOutIdWidth       = spatz_cluster_pkg::SpatzAxiIdOutWidth,
   parameter int unsigned IwcAxiIdOutWidth = 3,
 
   parameter type axi_wide_in_resp_t = spatz_axi_wide_in_resp_t,
@@ -229,9 +230,8 @@ module spatz_cluster_wrapper
   parameter type axi_wide_out_resp_t = spatz_axi_wide_out_resp_t,
   parameter type axi_wide_out_req_t  = spatz_axi_wide_out_req_t,
 
-  parameter type axi_narrow_in_resp_t = spatz_axi_narrow_in_resp_t,
-  parameter type axi_narrow_in_req_t  = spatz_axi_narrow_in_req_t,
-
+  parameter type axi_narrow_in_resp_t  = spatz_axi_narrow_in_resp_t,
+  parameter type axi_narrow_in_req_t   = spatz_axi_narrow_in_req_t,
   parameter type axi_narrow_out_resp_t = spatz_axi_narrow_out_resp_t,
   parameter type axi_narrow_out_req_t  = spatz_axi_narrow_out_req_t
 )(
@@ -242,11 +242,7 @@ module spatz_cluster_wrapper
   input  logic [NumCores-1:0] meip_i,
   input  logic [NumCores-1:0] mtip_i,
   input  logic [NumCores-1:0] msip_i,
-  input  logic [9:0]                    hart_base_id_i,
-  input  logic [AxiAddrWidth-1:0]       cluster_base_addr_i,
-  input  logic [AxiUserWidth-1:0]       axi_core_default_user_i,
   output logic                          cluster_probe_o,
-
   input  axi_narrow_in_req_t   axi_narrow_in_req_i,
   output axi_narrow_in_resp_t  axi_narrow_in_resp_o,
   output axi_narrow_out_req_t  axi_narrow_out_req_o,
@@ -264,6 +260,7 @@ module spatz_cluster_wrapper
   localparam int unsigned NumSpatzFPUs             [NumCores] = '{default: 4};
   localparam int unsigned NumSpatzIPUs             [NumCores] = '{default: 1};
 
+
   typedef logic [IwcAxiIdOutWidth-1:0] axi_id_out_iwc_t;
 
   `AXI_TYPEDEF_ALL(spatz_axi_wide_iwc_out, axi_addr_t, axi_id_out_iwc_t, axi_wide_data_t, axi_wide_strb_t, axi_user_t)
@@ -275,6 +272,10 @@ module spatz_cluster_wrapper
   spatz_axi_narrow_iwc_out_req_t axi_narrow_from_cluster_iwc_req;
   spatz_axi_narrow_iwc_out_resp_t axi_narrow_from_cluster_iwc_resp;
 
+
+
+
+ 
   axi_iw_converter #(
     .AxiSlvPortIdWidth ( IwcAxiIdOutWidth ),
     .AxiMstPortIdWidth ( AxiOutIdWidth ),
@@ -334,8 +335,8 @@ module spatz_cluster_wrapper
     .BootAddr (32'h1000),
     .ClusterPeriphSize (64),
     .NrCores (2),
-    .TCDMDepth (512),
-    .NrBanks (32),
+    .TCDMDepth (1024),
+    .NrBanks (16),
     .ICacheLineWidth (spatz_cluster_pkg::ICacheLineWidth),
     .ICacheLineCount (spatz_cluster_pkg::ICacheLineCount),
     .ICacheWays (spatz_cluster_pkg::ICacheWays),
@@ -355,12 +356,12 @@ module spatz_cluster_wrapper
     .axi_narrow_out_req_t (spatz_axi_narrow_iwc_out_req_t),
     .axi_narrow_out_resp_t (spatz_axi_narrow_iwc_out_resp_t),
     .Xdma (2'b01),
-    .DMAAxiReqFifoDepth (24),
-    .DMAReqFifoDepth (8),
+    .DMAAxiReqFifoDepth (3),
+    .DMAReqFifoDepth (3),
     .RegisterOffloadRsp (1),
     .RegisterCoreReq (1),
     .RegisterCoreRsp (1),
-    .RegisterTCDMCuts (1),
+    .RegisterTCDMCuts (0),
     .RegisterExtNarrow (0),
     .RegisterExtWide (0),
     .XbarLatency (axi_pkg::CUT_ALL_PORTS),
@@ -373,9 +374,9 @@ module spatz_cluster_wrapper
     .meip_i,
     .mtip_i,
     .msip_i,
-    .hart_base_id_i,
-    .cluster_base_addr_i,
-    .axi_core_default_user_i,
+    .hart_base_id_i (10'h0),
+    .cluster_base_addr_i (32'h100000),
+    .axi_core_default_user_i (2'h1),
     .cluster_probe_o,
     .axi_wide_in_req_i,
     .axi_wide_in_resp_o,
