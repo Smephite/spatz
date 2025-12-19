@@ -51,12 +51,12 @@ Disassembly of section .text:
     10ac:	00080337          	lui	t1,0x80
     10b0:	00666633          	or	a2,a2,t1
     10b4:	30461073          	csrw	0x304,a2
-    10b8:	10500073          	wfi
-    10bc:	0185a383          	lw	t2,24(a1)
-    10c0:	0205ae03          	lw	t3,32(a1)
-    10c4:	01c383b3          	add	t2,t2,t3
-    10c8:	05838393          	addi	t2,t2,88
-    10cc:	00038393          	mv	t2,t2
+    10b8:	0185a383          	lw	t2,24(a1)
+    10bc:	0205ae03          	lw	t3,32(a1)
+    10c0:	01c383b3          	add	t2,t2,t3
+    10c4:	05838393          	addi	t2,t2,88
+    10c8:	00038393          	mv	t2,t2
+    10cc:	10500073          	wfi
     10d0:	0003a383          	lw	t2,0(t2)
     10d4:	00038067          	jr	t2
 
