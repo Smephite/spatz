@@ -17,7 +17,13 @@ module tb_memory_axi #(
   /// Atomic memory support.
   parameter bit unsigned ATOPSupport = 1,
   parameter type req_t = logic,
-  parameter type rsp_t = logic
+  parameter type rsp_t = logic,
+
+  // Simulate External Memory
+  parameter bit          STALL_RANDOM_INPUT  = 0,
+  parameter bit          STALL_RANDOM_OUTPUT = 0,
+  parameter int unsigned FIXED_DELAY_INPUT   = 0,
+  parameter int unsigned FIXED_DELAY_OUTPUT  = 0
 )(
   input  logic clk_i,
   input  logic rst_ni,
@@ -48,7 +54,8 @@ module tb_memory_axi #(
     .AXI_USER_WIDTH ( AxiUserWidth )
   ) axi(),
     axi_wo_atomics(),
-    axi_wo_atomics_cut();
+    axi_wo_atomics_cut(),
+    axi_wo_atomics_cut_delay();
 
   `AXI_ASSIGN_FROM_REQ(axi, req_i)
   `AXI_ASSIGN_TO_RESP(rsp_o, axi)
@@ -88,6 +95,22 @@ module tb_memory_axi #(
     .out (axi_wo_atomics_cut)
   );
 
+  axi_delayer_intf #(
+    .AXI_ID_WIDTH   (AxiIdWidth),
+    .AXI_ADDR_WIDTH (AxiAddrWidth),
+    .AXI_DATA_WIDTH (AxiDataWidth),
+    .AXI_USER_WIDTH (AxiUserWidth),
+    .STALL_RANDOM_INPUT(STALL_RANDOM_INPUT),
+    .STALL_RANDOM_OUTPUT(STALL_RANDOM_OUTPUT),
+    .FIXED_DELAY_INPUT(FIXED_DELAY_INPUT),
+    .FIXED_DELAY_OUTPUT(FIXED_DELAY_OUTPUT)
+  ) i_delay (
+    .clk_i (clk_i),
+    .rst_ni (rst_ni),
+    .slv (axi_wo_atomics_cut),
+    .mst (axi_wo_atomics_cut_delay)
+  );
+
   // Convert AXI to a trivial register interface.
   axi_to_reg_intf #(
     .ADDR_WIDTH ( AxiAddrWidth ),
@@ -101,7 +124,7 @@ module tb_memory_axi #(
     .clk_i,
     .rst_ni,
     .testmode_i ( 1'b0 ),
-    .in         ( axi_wo_atomics_cut ),
+    .in         ( axi_wo_atomics_cut_delay ),
     .reg_o      ( regb )
   );
 

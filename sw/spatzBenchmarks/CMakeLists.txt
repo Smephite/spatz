@@ -70,6 +70,9 @@ add_library(dp-fconv2d dp-fconv2d/kernel/fconv2d.c)
 add_library(dp-fft dp-fft/kernel/fft.c)
 add_library(sp-fft sp-fft/kernel/fft.c)
 
+add_library(obpmark-1-1 obpmark-1-1/kernel/obpmark-kernel.c)
+add_library(obpmark-1-2 obpmark-1-2/kernel/obpmark-kernel.c)
+
 # Tests
 enable_testing()
 set(SNITCH_TEST_PREFIX spatzBenchmarks-)
@@ -114,3 +117,9 @@ add_spatz_test_twoParam(dp-fft dp-fft/main.c 128 2)
 
 add_spatz_test_twoParam(sp-fft sp-fft/main.c 256 2)
 add_spatz_test_twoParam(sp-fft sp-fft/main.c 512 2)
+
+add_spatz_test_twoParam(obpmark-1-1 obpmark-1-1/main.c 1024 1)
+
+add_spatz_test_oneParam(obpmark-1-2 obpmark-1-2/main.c 1024)
+#add_spatz_test_twoParam(obpmark obpmark/main.c 2048 1)
+#add_spatz_test_twoParam(obpmark obpmark/main.c 4096 1)

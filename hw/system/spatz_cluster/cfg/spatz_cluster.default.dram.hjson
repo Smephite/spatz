@@ -22,8 +22,8 @@
         
         "tie_ports": true,
         "tcdm": {
-            "size": 128,
-            "banks": 32
+            "size": 1024,
+            "banks": 16
         },
         "cluster_periph_size": 64, // kB
         "dma_axi_req_fifo_depth": 24,
