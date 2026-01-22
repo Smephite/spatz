@@ -111,12 +111,18 @@ package spatz_cluster_pkg;
                        fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED},  // FMA
-                    '{fpnew_pkg::DISABLED,
-                        fpnew_pkg::DISABLED,
-                        fpnew_pkg::DISABLED,
-                        fpnew_pkg::DISABLED,
-                        fpnew_pkg::DISABLED,
-                        fpnew_pkg::DISABLED}, // DIVSQRT
+                    '{fpnew_pkg::MERGED,
+                        fpnew_pkg::MERGED,
+                        fpnew_pkg::MERGED,
+                        fpnew_pkg::MERGED,
+                        fpnew_pkg::MERGED,
+                        fpnew_pkg::MERGED}, // DIVSQRT
+//                    '{fpnew_pkg::MERGED,
+//                        fpnew_pkg::MERGED,
+//                        fpnew_pkg::MERGED,
+//                        fpnew_pkg::MERGED,
+//                        fpnew_pkg::MERGED,
+//                        fpnew_pkg::MERGED}, // DIVSQRT                        
                     '{fpnew_pkg::PARALLEL,
                         fpnew_pkg::PARALLEL,
                         fpnew_pkg::PARALLEL,
@@ -134,7 +140,7 @@ package spatz_cluster_pkg;
                         fpnew_pkg::MERGED,
                         fpnew_pkg::MERGED,
                         fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED}},  // DOTP
+                        fpnew_pkg::MERGED}},  // DOTP //should be removed for 32-bit version
         PipeConfig: fpnew_pkg::BEFORE
     },
     '{
@@ -173,12 +179,18 @@ package spatz_cluster_pkg;
                        fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED},  // FMA
-                    '{fpnew_pkg::DISABLED,
-                        fpnew_pkg::DISABLED,
-                        fpnew_pkg::DISABLED,
-                        fpnew_pkg::DISABLED,
-                        fpnew_pkg::DISABLED,
-                        fpnew_pkg::DISABLED}, // DIVSQRT
+                    '{fpnew_pkg::MERGED,
+                        fpnew_pkg::MERGED,
+                        fpnew_pkg::MERGED,
+                        fpnew_pkg::MERGED,
+                        fpnew_pkg::MERGED,
+                        fpnew_pkg::MERGED}, // DIVSQRT
+//                    '{fpnew_pkg::MERGED,
+//                        fpnew_pkg::MERGED,
+//                        fpnew_pkg::MERGED,
+//                        fpnew_pkg::MERGED,
+//                        fpnew_pkg::MERGED,
+//                        fpnew_pkg::MERGED}, // DIVSQRT                        
                     '{fpnew_pkg::PARALLEL,
                         fpnew_pkg::PARALLEL,
                         fpnew_pkg::PARALLEL,
@@ -196,13 +208,29 @@ package spatz_cluster_pkg;
                         fpnew_pkg::MERGED,
                         fpnew_pkg::MERGED,
                         fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED}},  // DOTP
+                        fpnew_pkg::MERGED}},  // DOTP //should be removed for 32-bit version
         PipeConfig: fpnew_pkg::BEFORE
     }
   };
 
 endpackage
 // verilog_lint: waive-stop package-filename
+
+//package fpu0_cfg_pkg;
+//  import fpnew_pkg::*;
+//  import spatz_cluster_pkg::*;
+//
+//  function automatic fpu_implementation_t with_merged_ut1
+//      (input fpu_implementation_t base);
+//    fpu_implementation_t tmp = base;
+//    tmp.UnitTypes[1] = '{MERGED, MERGED, MERGED, MERGED, MERGED, MERGED};
+//    return tmp;
+//  endfunction
+//
+//  // Build a constant variant once
+//  localparam fpu_implementation_t FPUImplementation0 =
+//      with_merged_ut1(FPUImplementation[0]);
+//endpackage
 
 module spatz_cluster_wrapper
  import spatz_cluster_pkg::*;
