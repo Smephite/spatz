@@ -26,15 +26,21 @@ module spatz_cluster
   import snitch_pma_pkg::snitch_pma_t;
   #(
     /// Width of physical address.
-    parameter int                     unsigned               AxiAddrWidth                       = 48,
-    /// Width of AXI port.
-    parameter int                     unsigned               AxiDataWidth                       = 512,
+    parameter int unsigned PhysicalAddrWidth  = 48,
+    /// Width of regular data bus.
+    parameter int unsigned NarrowDataWidth    = 64,
+    /// Width of wide AXI port.
+    parameter int unsigned WideDataWidth      = 512,
     /// AXI: id width in.
-    parameter int                     unsigned               AxiIdWidthIn                       = 2,
-    /// AXI: id width out.
-    parameter int                     unsigned               AxiIdWidthOut                      = 2,
+    parameter int unsigned NarrowIdWidthIn    = 2,
+    /// AXI: dma id width in.
+    parameter int unsigned WideIdWidthIn      = 2,
     /// AXI: user width.
-    parameter int                     unsigned               AxiUserWidth                       = 1,
+    parameter int unsigned NarrowUserWidth    = 1,
+    /// AXI: dma user width.
+    parameter int unsigned WideUserWidth      = 1,
+    /// Width of the atomic ID to be used in a system.
+    parameter int unsigned AtomicIdWidth      = 1,
     /// Address from which to fetch the first instructions.
     parameter logic                            [31:0]        BootAddr                           = 32'h0,
     /// The total amount of cores.
@@ -81,18 +87,25 @@ module spatz_cluster
     parameter bit                                            RegisterCoreRsp                    = 1'b0,
     /// Insert Pipeline registers after each memory cut
     parameter bit                                            RegisterTCDMCuts                   = 1'b0,
-    /// Decouple external AXI plug
-    parameter bit                                            RegisterExt                        = 1'b0,
+    /// Decouple wide external AXI plug
+    parameter bit          RegisterExtWide    = 1'b0,
+    /// Decouple narrow external AXI plug
+    parameter bit          RegisterExtNarrow  = 1'b0,
     parameter axi_pkg::xbar_latency_e                        XbarLatency                        = axi_pkg::CUT_ALL_PORTS,
     /// Outstanding transactions on the AXI network
     parameter int                     unsigned               MaxMstTrans                        = 4,
     parameter int                     unsigned               MaxSlvTrans                        = 4,
     /// # Interface
     /// AXI Ports
-    parameter type                                           axi_in_req_t                       = logic,
-    parameter type                                           axi_in_resp_t                      = logic,
-    parameter type                                           axi_out_req_t                      = logic,
-    parameter type                                           axi_out_resp_t                     = logic,
+    parameter type                                           axi_narrow_in_req_t                       = logic,
+    parameter type                                           axi_narrow_in_resp_t                      = logic,
+    parameter type                                           axi_narrow_out_req_t                      = logic,
+    parameter type                                           axi_narrow_out_resp_t                     = logic,
+    /// AXI Ports
+    parameter type                                           axi_wide_in_req_t                         = logic,
+    parameter type                                           axi_wide_in_resp_t                        = logic,
+    parameter type                                           axi_wide_out_req_t                        = logic,
+    parameter type                                           axi_wide_out_resp_t                       = logic,
     // Memory latency parameter. Most of the memories have a read latency of 1. In
     // case you have memory macros which are pipelined you want to adjust this
     // value here. This only applies to the TCDM. The instruction cache macros will break!
@@ -124,19 +137,23 @@ module spatz_cluster
     input  logic          [9:0]              hart_base_id_i,
     /// Base address of cluster. TCDM and cluster peripheral location are derived from
     /// it. This signal is pseudo-static.
-    input  logic          [AxiAddrWidth-1:0] cluster_base_addr_i,
-    /// Default AXI User Signal for the Cluster Cores
-    /// General use: Atomic ID, needs to be unique ID of cluster
-    input  logic          [AxiUserWidth-1:0] axi_core_default_user_i,
+    input  logic          [PhysicalAddrWidth-1:0] cluster_base_addr_i,
     /// Per-cluster probe on the cluster status. Can be written by the cores to indicate
     /// to the overall system that the cluster is executing something.
     output logic                             cluster_probe_o,
     /// AXI Core cluster in-port.
-    input  axi_in_req_t                      axi_in_req_i,
-    output axi_in_resp_t                     axi_in_resp_o,
+    input  axi_narrow_in_req_t                      axi_narrow_in_req_i,
+    output axi_narrow_in_resp_t                     axi_narrow_in_resp_o,
     /// AXI Core cluster out-port.
-    output axi_out_req_t                     axi_out_req_o,
-    input  axi_out_resp_t                    axi_out_resp_i
+    output axi_narrow_out_req_t                     axi_narrow_out_req_o,
+    input  axi_narrow_out_resp_t                    axi_narrow_out_resp_i,
+
+    /// AXI Core cluster in-port.
+    input  axi_wide_in_req_t                        axi_wide_in_req_i,
+    output axi_wide_in_resp_t                       axi_wide_in_resp_o,
+    /// AXI Core cluster out-port.
+    output axi_wide_out_req_t                       axi_wide_out_req_o,
+    input  axi_wide_out_resp_t                      axi_wide_out_resp_i
   );
   // ---------
   // Imports
@@ -149,9 +166,9 @@ module spatz_cluster
   /// Minimum width to hold the core number.
   localparam int unsigned CoreIDWidth       = cf_math_pkg::idx_width(NrCores);
   localparam int unsigned TCDMMemAddrWidth  = $clog2(TCDMDepth);
-  localparam int unsigned TCDMSize          = NrBanks * TCDMDepth * (DataWidth/8);
+  localparam int unsigned TCDMSize          = NrBanks * TCDMDepth * (NarrowDataWidth/8);
   localparam int unsigned TCDMAddrWidth     = $clog2(TCDMSize);
-  localparam int unsigned BanksPerSuperBank = AxiDataWidth / DataWidth;
+  localparam int unsigned BanksPerSuperBank = WideDataWidth / NarrowDataWidth;
   localparam int unsigned NrSuperBanks      = NrBanks / BanksPerSuperBank;
 
   function automatic int unsigned get_tcdm_ports(int unsigned core);
@@ -166,27 +183,29 @@ module spatz_cluster
 
   localparam int   unsigned                    NrTCDMPortsCores = get_tcdm_port_offs(NrCores);
   localparam int   unsigned                    NumTCDMIn        = NrTCDMPortsCores + 1;
-  localparam logic          [AxiAddrWidth-1:0] TCDMMask         = ~(TCDMSize-1);
+  localparam logic          [PhysicalAddrWidth-1:0] TCDMMask         = ~(TCDMSize-1);
 
-  // Core Request, SoC Request
-  localparam int unsigned NrNarrowMasters = 2;
-
+  //
   // Narrow AXI network parameters
-  localparam int unsigned NarrowIdWidthIn  = AxiIdWidthIn;
-  localparam int unsigned NarrowIdWidthOut = NarrowIdWidthIn + $clog2(NrNarrowMasters);
-  localparam int unsigned NarrowDataWidth  = 64;
-  localparam int unsigned NarrowUserWidth  = AxiUserWidth;
+  //
 
-  // TCDM, Peripherals, SoC Request
-  localparam int unsigned NrNarrowSlaves = 3;
+  // Masters: Core Request, SoC Request
+  localparam int unsigned NrNarrowMasters = 2;
+  localparam int unsigned NarrowIdWidthOut = NarrowIdWidthIn + $clog2(NrNarrowMasters);
+  // Slaves: TCDM, Peripherals, SoC Request, BootROM
+  localparam int unsigned NrNarrowSlaves = 4;
   localparam int unsigned NrNarrowRules  = NrNarrowSlaves - 1;
 
-  // Core Request, DMA, Instruction cache
+  //
+  // Wide AXI network parameters
+  //
+
+  // Masters: SoC Request, DMA, I$
   localparam int unsigned NrWideMasters  = 3;
-  localparam int unsigned WideIdWidthOut = AxiIdWidthOut;
-  localparam int unsigned WideIdWidthIn  = WideIdWidthOut - $clog2(NrWideMasters);
-  // DMA X-BAR configuration
+  localparam int unsigned WideIdWidthOut = WideIdWidthIn + $clog2(NrWideMasters);
+  // Slaves: TCDM, Bootrom, SoC Request
   localparam int unsigned NrWideSlaves   = 3;
+  localparam int unsigned NrWideRules  = NrWideSlaves - 1;
 
   // AXI Configuration
   localparam axi_pkg::xbar_cfg_t ClusterXbarCfg = '{
@@ -199,7 +218,7 @@ module spatz_cluster
     AxiIdWidthSlvPorts: NarrowIdWidthIn,
     AxiIdUsedSlvPorts : NarrowIdWidthIn,
     UniqueIds         : 1'b0,
-    AxiAddrWidth      : AxiAddrWidth,
+    AxiAddrWidth      : PhysicalAddrWidth,
     AxiDataWidth      : NarrowDataWidth,
     NoAddrRules       : NrNarrowRules,
     default           : '0
@@ -216,26 +235,31 @@ module spatz_cluster
     AxiIdWidthSlvPorts: WideIdWidthIn,
     AxiIdUsedSlvPorts : WideIdWidthIn,
     UniqueIds         : 1'b0,
-    AxiAddrWidth      : AxiAddrWidth,
-    AxiDataWidth      : AxiDataWidth,
-    NoAddrRules       : 2,
+    AxiAddrWidth      : PhysicalAddrWidth,
+    AxiDataWidth      : WideDataWidth,
+    NoAddrRules       : NrWideRules,
     default           : '0
   };
 
   // --------
   // Typedefs
   // --------
-  typedef logic [AxiAddrWidth-1:0] addr_t;
+  typedef logic [PhysicalAddrWidth-1:0] addr_t;
+
   typedef logic [NarrowDataWidth-1:0] data_t;
   typedef logic [NarrowDataWidth/8-1:0] strb_t;
-  typedef logic [AxiDataWidth-1:0] data_dma_t;
-  typedef logic [AxiDataWidth/8-1:0] strb_dma_t;
+
+  typedef logic [WideDataWidth-1:0] data_dma_t;
+  typedef logic [WideDataWidth/8-1:0] strb_dma_t;
+  
   typedef logic [NarrowIdWidthIn-1:0] id_mst_t;
   typedef logic [NarrowIdWidthOut-1:0] id_slv_t;
+  
   typedef logic [WideIdWidthIn-1:0] id_dma_mst_t;
   typedef logic [WideIdWidthOut-1:0] id_dma_slv_t;
+  
   typedef logic [NarrowUserWidth-1:0] user_t;
-  typedef logic [AxiUserWidth-1:0] user_dma_t;
+  typedef logic [WideUserWidth-1:0] user_dma_t;
 
   typedef logic [TCDMMemAddrWidth-1:0] tcdm_mem_addr_t;
   typedef logic [TCDMAddrWidth-1:0] tcdm_addr_t;
@@ -283,7 +307,7 @@ module spatz_cluster
     logic dma_busy;
     axi_pkg::len_t aw_len, ar_len;
     axi_pkg::size_t aw_size, ar_size;
-    logic [$clog2(AxiDataWidth/8):0] num_bytes_written;
+    logic [$clog2(WideDataWidth/8):0] num_bytes_written;
   } dma_events_t;
 
   typedef struct packed {
@@ -315,7 +339,7 @@ module spatz_cluster
     data_t data;
   } acc_rsp_t;
 
-  `SNITCH_VM_TYPEDEF(AxiAddrWidth)
+  `SNITCH_VM_TYPEDEF(PhysicalAddrWidth)
 
   typedef struct packed {
     // Slow domain.
@@ -420,7 +444,7 @@ module spatz_cluster
   // -------------
   // Optionally decouple the external wide AXI master port.
   axi_cut #(
-    .Bypass     (!RegisterExt         ),
+    .Bypass     (!RegisterExtWide     ),
     .aw_chan_t  (axi_slv_dma_aw_chan_t),
     .w_chan_t   (axi_slv_dma_w_chan_t ),
     .b_chan_t   (axi_slv_dma_b_chan_t ),
@@ -433,26 +457,27 @@ module spatz_cluster
     .rst_ni     (rst_ni                     ),
     .slv_req_i  (wide_axi_slv_req[SoCDMAOut]),
     .slv_resp_o (wide_axi_slv_rsp[SoCDMAOut]),
-    .mst_req_o  (axi_out_req_o              ),
-    .mst_resp_i (axi_out_resp_i             )
+    .mst_req_o  (axi_wide_out_req_o              ),
+    .mst_resp_i (axi_wide_out_resp_i             )
   );
 
   axi_cut #(
-    .Bypass     (!RegisterExt     ),
-    .aw_chan_t  (axi_mst_aw_chan_t),
-    .w_chan_t   (axi_mst_w_chan_t ),
-    .b_chan_t   (axi_mst_b_chan_t ),
-    .ar_chan_t  (axi_mst_ar_chan_t),
-    .r_chan_t   (axi_mst_r_chan_t ),
-    .axi_req_t  (axi_mst_req_t    ),
-    .axi_resp_t (axi_mst_resp_t   )
-  ) i_cut_ext_narrow_in (
-    .clk_i      (clk_i                       ),
-    .rst_ni     (rst_ni                      ),
-    .slv_req_i  (axi_in_req_i                ),
-    .slv_resp_o (axi_in_resp_o               ),
-    .mst_req_o  (narrow_axi_mst_req[SoCDMAIn]),
-    .mst_resp_i (narrow_axi_mst_rsp[SoCDMAIn])
+    .Bypass     (!RegisterExtWide     ),
+    // should be of type axi_wide_... but that i need to add as parameters for the cluster
+    .aw_chan_t  ( axi_mst_dma_aw_chan_t),
+    .w_chan_t   ( axi_mst_dma_w_chan_t ),
+    .b_chan_t   ( axi_mst_dma_b_chan_t ),
+    .ar_chan_t  ( axi_mst_dma_ar_chan_t),
+    .r_chan_t   ( axi_mst_dma_r_chan_t ),
+    .axi_req_t  ( axi_wide_in_req_t    ),
+    .axi_resp_t ( axi_wide_in_resp_t   )
+  ) i_cut_ext_wide_in (
+    .clk_i      (clk_i                     ),
+    .rst_ni     (rst_ni                    ),
+    .slv_req_i  (axi_wide_in_req_i         ),
+    .slv_resp_o (axi_wide_in_resp_o        ),
+    .mst_req_o  (wide_axi_mst_req[SoCDMAIn]),
+    .mst_resp_i (wide_axi_mst_rsp[SoCDMAIn])
   );
 
   logic       [DmaXbarCfg.NoSlvPorts-1:0][$clog2(DmaXbarCfg.NoMstPorts)-1:0] dma_xbar_default_port;
@@ -508,8 +533,8 @@ module spatz_cluster
   axi_to_mem_interleaved #(
     .axi_req_t  (axi_slv_dma_req_t     ),
     .axi_resp_t (axi_slv_dma_resp_t    ),
-    .AddrWidth  (AxiAddrWidth          ),
-    .DataWidth  (AxiDataWidth          ),
+    .AddrWidth  (PhysicalAddrWidth          ),
+    .DataWidth  (WideDataWidth      ),
     .IdWidth    (WideIdWidthOut        ),
     .NumBanks   (1                     ),
     .BufDepth   (MemoryMacroLatency + 1)
@@ -544,7 +569,7 @@ module spatz_cluster
     .mem_rsp_t             (mem_dma_rsp_t     ),
     .user_t                (logic             ),
     .MemAddrWidth          (TCDMMemAddrWidth  ),
-    .DataWidth             (AxiDataWidth      ),
+    .DataWidth             (WideDataWidth     ),
     .MemoryResponseLatency (MemoryMacroLatency)
   ) i_dma_interconnect (
     .clk_i     (clk_i      ),
@@ -565,7 +590,7 @@ module spatz_cluster
 
     mem_wide_narrow_mux #(
       .NarrowDataWidth  (NarrowDataWidth),
-      .WideDataWidth    (AxiDataWidth   ),
+      .WideDataWidth    (WideDataWidth  ),
       .mem_narrow_req_t (mem_req_t      ),
       .mem_narrow_rsp_t (mem_rsp_t      ),
       .mem_wide_req_t   (mem_dma_req_t  ),
@@ -707,11 +732,11 @@ module spatz_cluster
       .RVD                     (RVD                        ),
       .RVV                     (RVV                        ),
       .Xdma                    (Xdma[i]                    ),
-      .AddrWidth               (AxiAddrWidth               ),
+      .AddrWidth               (PhysicalAddrWidth          ),
       .DataWidth               (NarrowDataWidth            ),
-      .UserWidth               (AxiUserWidth               ),
-      .DMADataWidth            (AxiDataWidth               ),
-      .DMAIdWidth              (AxiIdWidthIn               ),
+      .UserWidth               (WideUserWidth              ), // This is the DMA user width
+      .DMADataWidth            (WideDataWidth              ),
+      .DMAIdWidth              (WideIdWidthIn              ),
       .SnitchPMACfg            (SnitchPMACfg               ),
       .DMAAxiReqFifoDepth      (DMAAxiReqFifoDepth         ),
       .DMAReqFifoDepth         (DMAReqFifoDepth            ),
@@ -819,10 +844,10 @@ module spatz_cluster
     .LINE_WIDTH         ( ICacheLineWidth                                    ),
     .LINE_COUNT         ( ICacheLineCount                                    ),
     .WAY_COUNT          ( ICacheWays                                         ),
-    .FETCH_AW           ( AxiAddrWidth                                       ),
+    .FETCH_AW           ( PhysicalAddrWidth                                  ),
     .FETCH_DW           ( 32                                                 ),
-    .FILL_AW            ( AxiAddrWidth                                       ),
-    .FILL_DW            ( AxiDataWidth                                       ),
+    .FILL_AW            ( PhysicalAddrWidth                                  ),
+    .FILL_DW            ( WideDataWidth                                      ),
     .SERIAL_LOOKUP      ( 0                                                  ),
     .L1_TAG_SCM         ( 0                                                  ),
     .NUM_AXI_OUTSTANDING( 2                                                  ),
@@ -856,7 +881,7 @@ module spatz_cluster
   // Cores SoC
   // --------
   spatz_barrier #(
-    .AddrWidth (AxiAddrWidth ),
+    .AddrWidth (PhysicalAddrWidth ),
     .NrPorts   (NrCores      ),
     .dreq_t    (reqrsp_req_t ),
     .drsp_t    (reqrsp_rsp_t )
@@ -873,12 +898,14 @@ module spatz_cluster
   reqrsp_req_t core_to_axi_req;
   reqrsp_rsp_t core_to_axi_rsp;
   user_t       cluster_user;
-
-  assign cluster_user = axi_core_default_user_i;
-
+  
+  // Atomic ID, needs to be unique ID of cluster
+  // cluster_id + HartIdOffset + 1 (because 0 is for non-atomic masters)
+  assign cluster_user = //(core_to_axi_req.q.mask << AtomicIdWidth) | // TODO update reqres and include mask
+                        ((hart_base_id_i / NrCores) +  (hart_base_id_i % NrCores) + 1'b1);
   reqrsp_mux #(
     .NrPorts   (NrCores         ),
-    .AddrWidth (AxiAddrWidth    ),
+    .AddrWidth (PhysicalAddrWidth    ),
     .DataWidth (NarrowDataWidth ),
     .req_t     (reqrsp_req_t    ),
     .rsp_t     (reqrsp_rsp_t    ),
@@ -922,6 +949,11 @@ module spatz_cluster
       idx       : ClusterPeripherals,
       start_addr: cluster_periph_start_address,
       end_addr  : cluster_periph_end_address
+    },
+    '{
+      idx       : BootROMN,
+      start_addr: BootAddr,
+      end_addr  : BootAddr + 'h1000
     }
   };
 
@@ -957,6 +989,26 @@ module spatz_cluster
     .default_mst_port_i    (ClusterXbarDefaultPort     )
   );
 
+    // Optionally decouple the external narrow AXI slave port.
+  axi_cut #(
+    .Bypass (!RegisterExtNarrow),
+    // should be of type axi_narrow_in_... but that i need to add as parameters for the cluster
+    .aw_chan_t (axi_mst_aw_chan_t),
+    .w_chan_t  (axi_mst_w_chan_t),
+    .b_chan_t  (axi_mst_b_chan_t),
+    .ar_chan_t (axi_mst_ar_chan_t),
+    .r_chan_t  (axi_mst_r_chan_t),
+    .axi_req_t (axi_narrow_in_req_t),
+    .axi_resp_t(axi_narrow_in_resp_t)
+  ) i_cut_ext_narrow_slv (
+    .clk_i,
+    .rst_ni,
+    .slv_req_i (axi_narrow_in_req_i),
+    .slv_resp_o (axi_narrow_in_resp_o),
+    .mst_req_o (narrow_axi_mst_req[AXISoC]),
+    .mst_resp_i (narrow_axi_mst_rsp[AXISoC])
+  );
+
   // ---------
   // Slaves
   // ---------
@@ -967,7 +1019,7 @@ module spatz_cluster
     .axi_rsp_t  (axi_slv_resp_t        ),
     .tcdm_req_t (tcdm_req_t            ),
     .tcdm_rsp_t (tcdm_rsp_t            ),
-    .AddrWidth  (AxiAddrWidth          ),
+    .AddrWidth  (PhysicalAddrWidth          ),
     .DataWidth  (NarrowDataWidth       ),
     .IdWidth    (NarrowIdWidthOut      ),
     .BufDepth   (MemoryMacroLatency + 1)
@@ -982,7 +1034,7 @@ module spatz_cluster
 
   // 2. Peripherals
   axi_to_reg #(
-    .ADDR_WIDTH         (AxiAddrWidth     ),
+    .ADDR_WIDTH         (PhysicalAddrWidth     ),
     .DATA_WIDTH         (NarrowDataWidth  ),
     .AXI_MAX_WRITE_TXNS (1                ),
     .AXI_MAX_READ_TXNS  (1                ),
@@ -1004,7 +1056,7 @@ module spatz_cluster
   );
 
   spatz_cluster_peripheral #(
-    .AddrWidth     (AxiAddrWidth  ),
+    .AddrWidth     (PhysicalAddrWidth  ),
     .reg_req_t     (reg_req_t     ),
     .reg_rsp_t     (reg_rsp_t     ),
     .tcdm_events_t (tcdm_events_t ),
@@ -1029,26 +1081,190 @@ module spatz_cluster
   );
 
   // 3. BootROM
+
+  // We need both I$ (wide) and load/store (narrow) access to the bootrom.
+  // Id with differs between narrow and wide AXI, so we need to convert them
+  // Also the mux adds another bit to the id to distinguish between masters.
+
+  // wide_axi_slv_rsp[BootROM]
+  // wide_axi_slv_req[BootROM]
+  // narrow_axi_slv_rsp[BootROMN]
+  // narrow_axi_slv_req[BootROMN]
+
+
+  // Joined types
+  localparam int unsigned JoinedIdWidth = max(NarrowIdWidthOut, WideIdWidthOut) + 1;
+  localparam int unsigned JoinedUserWidth = max(NarrowUserWidth, WideUserWidth);
+  typedef logic [JoinedUserWidth-1:0] join_user_t;
+  typedef logic [JoinedIdWidth-1:0]   join_id_t;
+  typedef logic [JoinedIdWidth-2:0]   pre_join_id_t;
+  
+  `AXI_TYPEDEF_ALL_CT(axi_narrow_iw_conv, axi_narrow_iw_conv_req_t, axi_narrow_iw_conv_rsp_t,
+                      addr_t, pre_join_id_t, data_t, strb_t, user_t)
+  `AXI_TYPEDEF_ALL_CT(axi_wide_iw_conv, axi_wide_iw_conv_req_t, axi_wide_iw_conv_rsp_t,
+                      addr_t, pre_join_id_t, data_dma_t, strb_dma_t, user_dma_t)
+
+  axi_narrow_iw_conv_req_t axi_narrow_req_iw_conv;
+  axi_narrow_iw_conv_rsp_t axi_narrow_rsp_iw_conv;
+  axi_wide_iw_conv_req_t axi_wide_req_iw_conv;
+  axi_wide_iw_conv_rsp_t axi_wide_rsp_iw_conv;
+
+  axi_iw_converter #(
+    .AxiSlvPortIdWidth      ( NarrowIdWidthOut ),
+    .AxiMstPortIdWidth      ( JoinedIdWidth-1   ),
+    .AxiSlvPortMaxUniqIds   ( 2**NarrowIdWidthOut   ),
+    .AxiSlvPortMaxTxnsPerId ( 1 ),
+    .AxiSlvPortMaxTxns      ( 1  ),
+    .AxiMstPortMaxUniqIds   ( 1  ),
+    .AxiMstPortMaxTxnsPerId ( 1 ),
+    .AxiAddrWidth           ( PhysicalAddrWidth ),
+    .AxiDataWidth           ( NarrowDataWidth    ),
+    .AxiUserWidth           ( NarrowUserWidth    ),
+    .slv_req_t              ( axi_slv_req_t ),
+    .slv_resp_t             ( axi_slv_resp_t ),
+    .mst_req_t              ( axi_narrow_iw_conv_req_t ),
+    .mst_resp_t             ( axi_narrow_iw_conv_rsp_t )
+  ) i_axi_narrow_iw_converter (
+    .clk_i,
+    .rst_ni,
+    .slv_req_i  ( narrow_axi_slv_req[BootROMN] ),
+    .slv_resp_o ( narrow_axi_slv_rsp[BootROMN] ),
+    .mst_req_o  ( axi_narrow_req_iw_conv ),
+    .mst_resp_i ( axi_narrow_rsp_iw_conv )
+  );
+
+  axi_iw_converter #(
+    .AxiSlvPortIdWidth      ( WideIdWidthOut ),
+    .AxiMstPortIdWidth      ( JoinedIdWidth-1   ),
+    .AxiSlvPortMaxUniqIds   ( 2**WideIdWidthOut   ),
+    .AxiSlvPortMaxTxnsPerId ( 1 ),
+    .AxiSlvPortMaxTxns      ( 1  ),
+    .AxiMstPortMaxUniqIds   ( 1  ),
+    .AxiMstPortMaxTxnsPerId ( 1 ),
+    .AxiAddrWidth             ( PhysicalAddrWidth  ),
+    .AxiDataWidth             ( WideDataWidth ),
+    .AxiUserWidth             ( WideUserWidth ),
+    .slv_req_t                ( axi_slv_dma_req_t ),
+    .slv_resp_t               ( axi_slv_dma_resp_t ),
+    .mst_req_t                ( axi_wide_iw_conv_req_t ),
+    .mst_resp_t               ( axi_wide_iw_conv_rsp_t )
+  ) i_axi_wide_iw_converter (
+    .clk_i,
+    .rst_ni,
+    .slv_req_i  ( wide_axi_slv_req[BootROM] ),
+    .slv_resp_o ( wide_axi_slv_rsp[BootROM] ),
+    .mst_req_o  ( axi_wide_req_iw_conv ),
+    .mst_resp_i ( axi_wide_rsp_iw_conv )
+  );
+  
+  // We want to convert narrow -> wide so no need to change the width of the wide one
+  ///////////////////////////////
+  ///  Data width conversion  ///
+  ///////////////////////////////
+
+  `AXI_TYPEDEF_ALL_CT(axi_narrow_dw_conv, axi_narrow_dw_conv_req_t, axi_narrow_dw_conv_rsp_t,
+                      addr_t, pre_join_id_t, data_dma_t, strb_dma_t, user_t)
+
+  axi_narrow_dw_conv_req_t axi_narrow_req_dw_conv;
+  axi_narrow_dw_conv_rsp_t axi_narrow_rsp_dw_conv;
+
+  axi_dw_converter #(
+    .AxiMaxReads         ( 2 ),
+    .AxiSlvPortDataWidth ( NarrowDataWidth    ),
+    .AxiMstPortDataWidth ( WideDataWidth ),
+    .AxiAddrWidth        ( PhysicalAddrWidth ),
+    .AxiIdWidth          ( JoinedIdWidth-1       ),
+    .aw_chan_t           ( axi_narrow_iw_conv_aw_chan_t ),
+    .mst_w_chan_t        ( axi_narrow_dw_conv_w_chan_t  ),
+    .slv_w_chan_t        ( axi_narrow_iw_conv_w_chan_t  ),
+    .b_chan_t            ( axi_narrow_iw_conv_b_chan_t  ),
+    .ar_chan_t           ( axi_narrow_iw_conv_ar_chan_t ),
+    .mst_r_chan_t        ( axi_narrow_dw_conv_r_chan_t  ),
+    .slv_r_chan_t        ( axi_narrow_iw_conv_r_chan_t  ),
+    .axi_mst_req_t       ( axi_narrow_dw_conv_req_t ),
+    .axi_mst_resp_t      ( axi_narrow_dw_conv_rsp_t ),
+    .axi_slv_req_t       ( axi_narrow_iw_conv_req_t ),
+    .axi_slv_resp_t      ( axi_narrow_iw_conv_rsp_t )
+  ) i_axi_narrow_dw_converter (
+    .clk_i,
+    .rst_ni,
+    .slv_req_i  ( axi_narrow_req_iw_conv ),
+    .slv_resp_o ( axi_narrow_rsp_iw_conv ),
+    .mst_req_o  ( axi_narrow_req_dw_conv ),
+    .mst_resp_i ( axi_narrow_rsp_dw_conv )
+  );
+
+  /////////////
+  ///  MUX  ///
+  /////////////
+
+  `AXI_TYPEDEF_ALL(axi_bootrom_in,
+                      addr_t, pre_join_id_t, data_dma_t, strb_dma_t, join_user_t)
+  `AXI_TYPEDEF_ALL(axi_bootrom_wide_in,
+                      addr_t, pre_join_id_t, data_dma_t, strb_dma_t, join_user_t)
+
+  axi_bootrom_in_req_t axi_bootrom_wide_in_req, axi_bootrom_narrow_in_req;
+  axi_bootrom_in_resp_t axi_bootrom_wide_in_resp, axi_bootrom_narrow_in_resp;   
+  
+  `AXI_ASSIGN_REQ_STRUCT(axi_bootrom_narrow_in_req, axi_narrow_req_dw_conv);
+  `AXI_ASSIGN_REQ_STRUCT(axi_bootrom_wide_in_req, axi_wide_req_iw_conv);
+  
+  `AXI_ASSIGN_RESP_STRUCT(axi_narrow_rsp_dw_conv, axi_bootrom_narrow_in_resp);
+  `AXI_ASSIGN_RESP_STRUCT(axi_wide_rsp_iw_conv, axi_bootrom_wide_in_resp);
+
+
+  `AXI_TYPEDEF_ALL_CT(axi_bootrom, axi_bootrom_req_t, axi_bootrom_rsp_t,
+                      addr_t, join_id_t, data_dma_t, strb_dma_t, join_user_t)
+  axi_bootrom_req_t axi_bootrom_req;
+  axi_bootrom_rsp_t axi_bootrom_rsp;
+
+  axi_mux #(
+    .SlvAxiIDWidth  ( JoinedIdWidth-1 ),
+    .NoSlvPorts     ( 2 ),
+    .MaxWTrans      ( 2 ),
+    .slv_aw_chan_t  ( axi_narrow_dw_conv_aw_chan_t ),
+    .slv_b_chan_t   ( axi_narrow_dw_conv_b_chan_t  ),
+    .slv_ar_chan_t  ( axi_narrow_dw_conv_ar_chan_t ),
+    .slv_r_chan_t   ( axi_narrow_dw_conv_r_chan_t  ),
+    .mst_aw_chan_t  ( axi_bootrom_aw_chan_t ),
+    .mst_b_chan_t   ( axi_bootrom_b_chan_t  ),
+    .mst_ar_chan_t  ( axi_bootrom_ar_chan_t ),
+    .mst_r_chan_t   ( axi_bootrom_r_chan_t  ),
+    .w_chan_t       ( axi_bootrom_w_chan_t  ),
+    .slv_req_t      ( axi_narrow_dw_conv_req_t ),
+    .slv_resp_t     ( axi_narrow_dw_conv_rsp_t ),
+    .mst_req_t      ( axi_bootrom_req_t ),
+    .mst_resp_t     ( axi_bootrom_rsp_t )
+  ) i_axi_mux (
+    .clk_i,
+    .rst_ni,
+    .test_i      ( 1'b0 ),
+    .slv_reqs_i  ( {axi_bootrom_wide_in_req, axi_bootrom_narrow_in_req} ),
+    .slv_resps_o ( {axi_bootrom_wide_in_resp, axi_bootrom_narrow_in_resp} ),
+    .mst_req_o   ( axi_bootrom_req ),
+    .mst_resp_i  ( axi_bootrom_rsp )
+  );
+
   axi_to_reg #(
-    .ADDR_WIDTH         (AxiAddrWidth      ),
-    .DATA_WIDTH         (AxiDataWidth      ),
+    .ADDR_WIDTH         (PhysicalAddrWidth ),
+    .DATA_WIDTH         (WideDataWidth     ),
     .AXI_MAX_WRITE_TXNS (1                 ),
     .AXI_MAX_READ_TXNS  (1                 ),
     .DECOUPLE_W         (0                 ),
-    .ID_WIDTH           (WideIdWidthOut    ),
-    .USER_WIDTH         (AxiUserWidth      ),
-    .axi_req_t          (axi_slv_dma_req_t ),
-    .axi_rsp_t          (axi_slv_dma_resp_t),
+    .ID_WIDTH           (JoinedIdWidth     ),
+    .USER_WIDTH         (JoinedUserWidth   ),
+    .axi_req_t          (axi_bootrom_req_t ),
+    .axi_rsp_t          (axi_bootrom_rsp_t ),
     .reg_req_t          (reg_dma_req_t     ),
     .reg_rsp_t          (reg_dma_rsp_t     )
   ) i_axi_to_reg_bootrom (
-    .clk_i      (clk_i                    ),
-    .rst_ni     (rst_ni                   ),
-    .testmode_i (1'b0                     ),
-    .axi_req_i  (wide_axi_slv_req[BootROM]),
-    .axi_rsp_o  (wide_axi_slv_rsp[BootROM]),
-    .reg_req_o  (bootrom_reg_req          ),
-    .reg_rsp_i  (bootrom_reg_rsp          )
+    .clk_i      (clk_i          ),
+    .rst_ni     (rst_ni         ),
+    .testmode_i (1'b0           ),
+    .axi_req_i  (axi_bootrom_req),
+    .axi_rsp_o  (axi_bootrom_rsp),
+    .reg_req_o  (bootrom_reg_req),
+    .reg_rsp_i  (bootrom_reg_rsp)
   );
 
   bootrom i_bootrom (
@@ -1060,59 +1276,23 @@ module spatz_cluster
   `FF(bootrom_reg_rsp.ready, bootrom_reg_req.valid, 1'b0)
   assign bootrom_reg_rsp.error = 1'b0;
 
-  // Upsize the narrow SoC connection
-  `AXI_TYPEDEF_ALL(axi_mst_dma_narrow, addr_t, id_dma_mst_t, data_t, strb_t, user_t)
-  axi_mst_dma_narrow_req_t  narrow_axi_slv_req_soc;
-  axi_mst_dma_narrow_resp_t narrow_axi_slv_resp_soc;
-
-  axi_iw_converter #(
-    .AxiAddrWidth          (AxiAddrWidth             ),
-    .AxiDataWidth          (NarrowDataWidth          ),
-    .AxiUserWidth          (AxiUserWidth             ),
-    .AxiSlvPortIdWidth     (NarrowIdWidthOut         ),
-    .AxiSlvPortMaxUniqIds  (1                        ),
-    .AxiSlvPortMaxTxnsPerId(1                        ),
-    .AxiSlvPortMaxTxns     (1                        ),
-    .AxiMstPortIdWidth     (WideIdWidthIn            ),
-    .AxiMstPortMaxUniqIds  (1                        ),
-    .AxiMstPortMaxTxnsPerId(1                        ),
-    .slv_req_t             (axi_slv_req_t            ),
-    .slv_resp_t            (axi_slv_resp_t           ),
-    .mst_req_t             (axi_mst_dma_narrow_req_t ),
-    .mst_resp_t            (axi_mst_dma_narrow_resp_t)
-  ) i_soc_port_iw_convert (
-    .clk_i      (clk_i                   ),
-    .rst_ni     (rst_ni                  ),
-    .slv_req_i  (narrow_axi_slv_req[SoC] ),
-    .slv_resp_o (narrow_axi_slv_rsp[SoC] ),
-    .mst_req_o  (narrow_axi_slv_req_soc  ),
-    .mst_resp_i (narrow_axi_slv_resp_soc )
-  );
-
-  axi_dw_converter #(
-    .AxiAddrWidth       (AxiAddrWidth               ),
-    .AxiIdWidth         (WideIdWidthIn              ),
-    .AxiMaxReads        (2                          ),
-    .AxiSlvPortDataWidth(NarrowDataWidth            ),
-    .AxiMstPortDataWidth(AxiDataWidth               ),
-    .ar_chan_t          (axi_mst_dma_ar_chan_t      ),
-    .aw_chan_t          (axi_mst_dma_aw_chan_t      ),
-    .b_chan_t           (axi_mst_dma_b_chan_t       ),
-    .slv_r_chan_t       (axi_mst_dma_narrow_r_chan_t),
-    .slv_w_chan_t       (axi_mst_dma_narrow_b_chan_t),
-    .axi_slv_req_t      (axi_mst_dma_narrow_req_t   ),
-    .axi_slv_resp_t     (axi_mst_dma_narrow_resp_t  ),
-    .mst_r_chan_t       (axi_mst_dma_r_chan_t       ),
-    .mst_w_chan_t       (axi_mst_dma_w_chan_t       ),
-    .axi_mst_req_t      (axi_mst_dma_req_t          ),
-    .axi_mst_resp_t     (axi_mst_dma_resp_t         )
-  ) i_soc_port_dw_upsize (
-    .clk_i      (clk_i                        ),
-    .rst_ni     (rst_ni                       ),
-    .slv_req_i  (narrow_axi_slv_req_soc       ),
-    .slv_resp_o (narrow_axi_slv_resp_soc      ),
-    .mst_req_o  (wide_axi_mst_req[CoreReqWide]),
-    .mst_resp_i (wide_axi_mst_rsp[CoreReqWide])
+  // Optionally decouple the external AXI plug.
+  axi_cut #(
+    .Bypass     ( !RegisterExtNarrow ),
+    .aw_chan_t  ( axi_slv_aw_chan_t ),
+    .w_chan_t   ( axi_slv_w_chan_t ),
+    .b_chan_t   ( axi_slv_b_chan_t ),
+    .ar_chan_t  ( axi_slv_ar_chan_t ),
+    .r_chan_t   ( axi_slv_r_chan_t ),
+    .axi_req_t  ( axi_slv_req_t ),
+    .axi_resp_t ( axi_slv_resp_t )
+  ) i_cut_ext_narrow_mst (
+    .clk_i      ( clk_i           ),
+    .rst_ni     ( rst_ni          ),
+    .slv_req_i  ( narrow_axi_slv_req[SoC] ),
+    .slv_resp_o ( narrow_axi_slv_rsp[SoC] ),
+    .mst_req_o  ( axi_narrow_out_req_o   ),
+    .mst_resp_i ( axi_narrow_out_resp_i   )
   );
 
   // --------------------
@@ -1148,5 +1328,10 @@ module spatz_cluster
   `ASSERT(ClusterBaseAddrAlign, ((TCDMSize - 1) & cluster_base_addr_i) == 0)
   // Make sure we only have one DMA in the system.
   `ASSERT_INIT(NumberDMA, $onehot0(Xdma))
+
+  /// Helper function to calculate the maximum of two unsigned integers
+  function automatic int unsigned max(int unsigned a, int unsigned b);
+    return (a > b) ? a : b;
+  endfunction
 
 endmodule

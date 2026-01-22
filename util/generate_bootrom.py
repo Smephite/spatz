@@ -7,7 +7,7 @@
 # Author: Samuel Riedel, ETH Zurich
 
 from string import Template
-from math import log2
+from math import log2, ceil
 import argparse
 import hjson
 import os.path
@@ -121,7 +121,9 @@ def read_bin():
         rom = bytes.hex(f.read())
         rom = list(map("".join, zip(rom[::2], rom[1::2])))
     # align to 64 bit
-    align = (int((len(rom) + 7) / 8)) * 8
+    print("Bootrom size (bytes): ", len(rom))
+    align = int(ceil(len(rom)/(DataWidth / 8)) * (DataWidth / 8))
+    print("Padding bootrom with (bytes): ", align - len(rom))
     for i in range(len(rom), align):
         rom.append("00")
     return rom
@@ -134,6 +136,9 @@ rom = read_bin()
 with open(output, "w") as f:
     rom_str = ""
     ByteWidth = int(DataWidth / 8)
+
+    print("Reading rom from {} : {} bytes".format(filename + ".bin", len(rom)))
+    print("Generating rom with DataWidth={} bits ({} bytes) => {} entries".format(DataWidth, ByteWidth, int(len(rom) / ByteWidth)))
     # process in junks of DataWidth bit (DataWidth/8 byte)
     for i in reversed(range(int(len(rom) / ByteWidth))):
         rom_str += "    {}'h".format(DataWidth)

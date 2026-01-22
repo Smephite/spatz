@@ -24,13 +24,15 @@ module testharness (
    *  AXI  *
    *********/
 
-  localparam NumAXISlaves = 2;
-  localparam NumRules     = NumAXISlaves-1;
+  spatz_axi_narrow_out_req_t  axi_narrow_from_cluster_req;
+  spatz_axi_narrow_out_resp_t axi_narrow_from_cluster_resp;
+  spatz_axi_narrow_in_req_t   axi_narrow_to_cluster_req;
+  spatz_axi_narrow_in_resp_t  axi_narrow_to_cluster_resp;
 
-  spatz_axi_out_req_t  axi_from_cluster_req;
-  spatz_axi_out_resp_t axi_from_cluster_resp;
-  spatz_axi_in_req_t   axi_to_cluster_req;
-  spatz_axi_in_resp_t  axi_to_cluster_resp;
+  spatz_axi_wide_out_req_t  axi_wide_from_cluster_req;
+  spatz_axi_wide_out_resp_t axi_wide_from_cluster_resp;
+  spatz_axi_wide_in_req_t   axi_wide_to_cluster_req;
+  spatz_axi_wide_in_resp_t  axi_wide_to_cluster_resp;
 
 
   /*********
@@ -47,10 +49,17 @@ module testharness (
     .msip_i          ('0                   ),
     .mtip_i          ('0                   ),
     .debug_req_i     ( debug_req           ),
-    .axi_out_req_o   (axi_from_cluster_req ),
-    .axi_out_resp_i  (axi_from_cluster_resp),
-    .axi_in_req_i    (axi_to_cluster_req   ),
-    .axi_in_resp_o   (axi_to_cluster_resp  ),
+
+    .axi_narrow_out_req_o   (axi_narrow_from_cluster_req ),
+    .axi_narrow_out_resp_i  (axi_narrow_from_cluster_resp),
+    .axi_narrow_in_req_i    (axi_narrow_to_cluster_req   ),
+    .axi_narrow_in_resp_o   (axi_narrow_to_cluster_resp  ),
+
+    .axi_wide_out_req_o   (axi_wide_from_cluster_req ),
+    .axi_wide_out_resp_i  (axi_wide_from_cluster_resp),
+    .axi_wide_in_req_i    (axi_wide_to_cluster_req   ),
+    .axi_wide_in_resp_o   (axi_wide_to_cluster_resp  ),
+
     .cluster_probe_o (cluster_probe        )
   );
 /**************
@@ -91,18 +100,18 @@ module testharness (
   reqrsp_cluster_in_rsp_t to_cluster_rsp;
 
   reqrsp_to_axi #(
-    .DataWidth   (DataWidth              ),
-    .UserWidth   (SpatzAxiUserWidth      ),
-    .axi_req_t   (spatz_axi_in_req_t     ),
-    .axi_rsp_t   (spatz_axi_in_resp_t    ),
-    .reqrsp_req_t(reqrsp_cluster_in_req_t),
-    .reqrsp_rsp_t(reqrsp_cluster_in_rsp_t)
+    .DataWidth   (NarrowDataWidth           ),
+    .UserWidth   (NarrowUserWidth           ),
+    .axi_req_t   (spatz_axi_narrow_in_req_t ),
+    .axi_rsp_t   (spatz_axi_narrow_in_resp_t),
+    .reqrsp_req_t(reqrsp_cluster_in_req_t   ),
+    .reqrsp_rsp_t(reqrsp_cluster_in_rsp_t   )
   ) i_axi_to_reqrsp (
     .clk_i       (clk_i              ),
     .rst_ni      (rst_ni             ),
     .user_i      ('0                 ),
-    .axi_req_o   (axi_to_cluster_req ),
-    .axi_rsp_i   (axi_to_cluster_resp),
+    .axi_req_o   (axi_narrow_to_cluster_req ),
+    .axi_rsp_i   (axi_narrow_to_cluster_resp),
     .reqrsp_req_i(to_cluster_req     ),
     .reqrsp_rsp_o(to_cluster_rsp     )
   );
@@ -165,17 +174,35 @@ module testharness (
 
   // Wide port into simulation memory.
   tb_memory_axi #(
-    .AxiAddrWidth ( SpatzAxiAddrWidth    ),
-    .AxiDataWidth ( SpatzAxiDataWidth    ),
-    .AxiIdWidth   ( SpatzAxiIdOutWidth   ),
-    .AxiUserWidth ( SpatzAxiUserWidth    ),
-    .req_t        ( spatz_axi_out_req_t  ),
-    .rsp_t        ( spatz_axi_out_resp_t )
-  ) i_dma (
+    .AxiAddrWidth ( AddrWidth     ),
+    .AxiDataWidth ( WideDataWidth ),
+    .AxiIdWidth   ( WideIdWidthOut    ),
+    .AxiUserWidth ( WideUserWidth     ),
+    .req_t        ( spatz_axi_wide_out_req_t  ),
+    .rsp_t        ( spatz_axi_wide_out_resp_t )
+  ) i_l2_wide (
     .clk_i (clk_i                ),
     .rst_ni(rst_ni               ),
-    .req_i (axi_from_cluster_req ),
-    .rsp_o (axi_from_cluster_resp)
+    .req_i (axi_wide_from_cluster_req ),
+    .rsp_o (axi_wide_from_cluster_resp)
   );
+
+  tb_memory_axi #(
+    .AxiAddrWidth ( AddrWidth     ),
+    .AxiDataWidth ( NarrowDataWidth ),
+    .AxiIdWidth   ( NarrowIdWidthOut    ),
+    .AxiUserWidth ( NarrowUserWidth     ),
+    .req_t        ( spatz_axi_narrow_out_req_t  ),
+    .rsp_t        ( spatz_axi_narrow_out_resp_t )
+  ) i_l2_narrow (
+    .clk_i (clk_i                ),
+    .rst_ni(rst_ni               ),
+    .req_i (axi_narrow_from_cluster_req ),
+    .rsp_o (axi_narrow_from_cluster_resp)
+  );
+
+
+  // Tie unused ports
+  assign axi_wide_to_cluster_req   = '0;
 
 endmodule : testharness
