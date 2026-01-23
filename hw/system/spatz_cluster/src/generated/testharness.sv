@@ -180,7 +180,7 @@ module testharness (
     .AxiUserWidth ( WideUserWidth     ),
     .req_t        ( spatz_axi_wide_out_req_t  ),
     .rsp_t        ( spatz_axi_wide_out_resp_t )
-  ) i_l2_wide (
+  ) i_l2 (
     .clk_i (clk_i                ),
     .rst_ni(rst_ni               ),
     .req_i (axi_wide_from_cluster_req ),
@@ -200,7 +200,6 @@ module testharness (
     .req_i (axi_narrow_from_cluster_req ),
     .rsp_o (axi_narrow_from_cluster_resp)
   );
-
 
   // Tie unused ports
   assign axi_wide_to_cluster_req   = '0;

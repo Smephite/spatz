@@ -25,7 +25,7 @@ package spatz_cluster_pkg;
   localparam int unsigned NarrowDataWidth = 64;
   localparam int unsigned NarrowStrbWidth = NarrowDataWidth / 8;
   localparam int unsigned NarrowIdWidthIn = 2;
-  localparam int unsigned NarrowUserWidth = 10;
+  localparam int unsigned NarrowUserWidth = 3;
 
   // DMA Axi Parameters
   localparam int unsigned WideDataWidth = 512;
@@ -75,13 +75,13 @@ package spatz_cluster_pkg;
   //  Spatz Cluster //
   ////////////////////
 
-  localparam int unsigned NumCores = 2;
+  localparam int unsigned NumCores = 1;
 
-  localparam int unsigned ICacheLineWidth = 128;
-  localparam int unsigned ICacheLineCount = 128;
+  localparam int unsigned ICacheLineWidth = 256;
+  localparam int unsigned ICacheLineCount = 64;
   localparam int unsigned ICacheWays = 2;
 
-  localparam int unsigned TCDMStartAddr = 48'h100000;
+  localparam int unsigned TCDMStartAddr = 48'h20000000;
   localparam int unsigned TCDMSize      = 48'h20000;
 
   localparam int unsigned PeriStartAddr = TCDMStartAddr + TCDMSize;
@@ -91,85 +91,18 @@ package spatz_cluster_pkg;
   function automatic snitch_pma_pkg::rule_t [snitch_pma_pkg::NrMaxRules-1:0] get_cached_regions();
     automatic snitch_pma_pkg::rule_t [snitch_pma_pkg::NrMaxRules-1:0] cached_regions;
     cached_regions = '{default: '0};
-    cached_regions[0] = '{base: 48'h80000000, mask: 48'hffff80000000};
+    cached_regions[0] = '{base: 48'h40000000, mask: 48'hffffe0000000};
+    cached_regions[1] = '{base: 48'h70000000, mask: 48'hfffff0000000};
     return cached_regions;
   endfunction
 
   localparam snitch_pma_pkg::snitch_pma_t SnitchPMACfg = '{
-      NrCachedRegionRules: 1,
+      NrCachedRegionRules: 2,
       CachedRegion: get_cached_regions(),
       default: 0
   };
 
   localparam fpnew_pkg::fpu_implementation_t FPUImplementation [NumCores] = '{
-    '{
-        PipeRegs: // FMA Block
-                  '{
-                    '{  2, // FP32
-                        4, // FP64
-                        1, // FP16
-                        0, // FP8
-                        1, // FP16alt
-                        0  // FP8alt
-                      },
-                    '{1, 1, 1, 1, 1, 1},   // DIVSQRT
-                    '{1,
-                      1,
-                      1,
-                      1,
-                      1,
-                      1},   // NONCOMP
-                    '{2,
-                      2,
-                      2,
-                      2,
-                      2,
-                      2},   // CONV
-                    '{4,
-                      4,
-                      4,
-                      4,
-                      4,
-                      4}    // DOTP
-                    },
-        UnitTypes: '{'{fpnew_pkg::MERGED,
-                       fpnew_pkg::MERGED,
-                       fpnew_pkg::MERGED,
-                       fpnew_pkg::MERGED,
-                       fpnew_pkg::MERGED,
-                       fpnew_pkg::MERGED},  // FMA
-                    '{fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED}, // DIVSQRT
-//                    '{fpnew_pkg::MERGED,
-//                        fpnew_pkg::MERGED,
-//                        fpnew_pkg::MERGED,
-//                        fpnew_pkg::MERGED,
-//                        fpnew_pkg::MERGED,
-//                        fpnew_pkg::MERGED}, // DIVSQRT                        
-                    '{fpnew_pkg::PARALLEL,
-                        fpnew_pkg::PARALLEL,
-                        fpnew_pkg::PARALLEL,
-                        fpnew_pkg::PARALLEL,
-                        fpnew_pkg::PARALLEL,
-                        fpnew_pkg::PARALLEL}, // NONCOMP
-                    '{fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED},   // CONV
-                    '{fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED}},  // DOTP //should be removed for 32-bit version
-        PipeConfig: fpnew_pkg::BEFORE
-    },
     '{
         PipeRegs: // FMA Block
                   '{
@@ -285,9 +218,9 @@ module spatz_cluster_wrapper
   input  spatz_axi_wide_out_resp_t   axi_wide_out_resp_i
 );
 
-  localparam int unsigned NumIntOutstandingLoads   [NumCores] = '{1, 1};
-  localparam int unsigned NumIntOutstandingMem     [NumCores] = '{4, 4};
-  localparam int unsigned NumSpatzOutstandingLoads [NumCores] = '{4, 4};
+  localparam int unsigned NumIntOutstandingLoads   [NumCores] = '{1};
+  localparam int unsigned NumIntOutstandingMem     [NumCores] = '{4};
+  localparam int unsigned NumSpatzOutstandingLoads [NumCores] = '{4};
   localparam int unsigned NumSpatzFPUs             [NumCores] = '{default: 4};
   localparam int unsigned NumSpatzIPUs             [NumCores] = '{default: 1};
 
@@ -303,9 +236,9 @@ module spatz_cluster_wrapper
     .WideUserWidth (WideUserWidth),
     .BootAddr (32'h1000),
     .ClusterPeriphSize (64),
-    .NrCores (2),
-    .TCDMDepth (512),
-    .NrBanks (32),
+    .NrCores (1),
+    .TCDMDepth (1024),
+    .NrBanks (16),
     .ICacheLineWidth (spatz_cluster_pkg::ICacheLineWidth),
     .ICacheLineCount (spatz_cluster_pkg::ICacheLineCount),
     .ICacheWays (spatz_cluster_pkg::ICacheWays),
@@ -316,7 +249,7 @@ module spatz_cluster_wrapper
     .NumSpatzOutstandingLoads (NumSpatzOutstandingLoads),
     .NumSpatzFPUs (NumSpatzFPUs),
     .NumSpatzIPUs (NumSpatzIPUs),
-    .Xdma (2'b01),
+    .Xdma (1'b1),
     .DMAAxiReqFifoDepth (24),
     .DMAReqFifoDepth (8),
     .RegisterOffloadRsp (1),
@@ -343,8 +276,8 @@ module spatz_cluster_wrapper
     .meip_i,
     .mtip_i,
     .msip_i,
-    .hart_base_id_i (10'h0),
-    .cluster_base_addr_i (48'h100000),
+    .hart_base_id_i,
+    .cluster_base_addr_i,
     .cluster_probe_o,
     // AXI Slave Port
     .axi_wide_in_req_i,

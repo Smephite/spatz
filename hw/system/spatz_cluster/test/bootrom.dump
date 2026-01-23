@@ -71,18 +71,30 @@ Disassembly of section .rodata:
     10e2:	0000                	unimp
     10e4:	0000                	unimp
     10e6:	0000                	unimp
-    10e8:	0002                	0x2
+    10e8:	0001                	nop
+    10ea:	0000                	unimp
+    10ec:	0000                	unimp
+    10ee:	0000                	unimp
+    10f0:	0001                	nop
 	...
-    10fa:	0010                	addi	a2,sp,0
+    10fa:	2000                	fld	fs0,0(s0)
     10fc:	0000                	unimp
     10fe:	0000                	unimp
     1100:	0000                	unimp
     1102:	0002                	0x2
-	...
+    1104:	0000                	unimp
+    1106:	0000                	unimp
+    1108:	0000                	unimp
+    110a:	0004                	addi	s1,sp,0
+    110c:	0000                	unimp
+    110e:	0000                	unimp
     1110:	0000                	unimp
-    1112:	8000                	0x8000
-	...
-    111c:	0001                	nop
+    1112:	4000                	lw	s0,0(s0)
+    1114:	0000                	unimp
+    1116:	0000                	unimp
+    1118:	0000                	unimp
+    111a:	6000                	flw	fs0,0(s0)
+    111c:	0000                	unimp
 	...
 
 Disassembly of section .boot_section:

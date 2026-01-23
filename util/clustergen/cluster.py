@@ -400,6 +400,15 @@ class SnitchClusterTB(Generator):
             self.cfg["dram"]["length"],
             self.cfg["cluster"]["addr_width"],
         )
+
+        if "l2" in self.cfg and "length" in self.cfg["l2"] and "address" in self.cfg["l2"] and self.cfg["l2"]["address"] > 0:
+            pma_cfg.add_region_length(
+                PMA.CACHED,
+                self.cfg["l2"]["address"],
+                self.cfg["l2"]["length"],
+                self.cfg["cluster"]["addr_width"],
+            )
+
         if "tie_ports" not in self.cfg["cluster"]:
             self.cfg["cluster"]["tie_ports"] = True
 
