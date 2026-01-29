@@ -955,11 +955,13 @@ module spatz_decoder
             unique casez (decoder_req_i.instr)
               riscv_instr::VFDIV_VV,
               riscv_instr::VFDIV_VF: begin
-                spatz_req.op = VFDIV;
+                illegal_instr = 1'b1; // TODO: Support vector floating point divide
+                //spatz_req.op = VFDIV;
               end
 
               riscv_instr::VFSQRT_V: begin
-                spatz_req.op = VFSQRT;
+                illegal_instr = 1'b1;  // TODO: Support vector floating point divide
+                //spatz_req.op = VFSQRT;
               end
             
               riscv_instr::VFADD_VV,
