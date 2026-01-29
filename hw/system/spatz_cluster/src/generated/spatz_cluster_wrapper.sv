@@ -138,80 +138,12 @@ package spatz_cluster_pkg;
                        fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED},  // FMA
-                    '{fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED}, // DIVSQRT
-//                    '{fpnew_pkg::MERGED,
-//                        fpnew_pkg::MERGED,
-//                        fpnew_pkg::MERGED,
-//                        fpnew_pkg::MERGED,
-//                        fpnew_pkg::MERGED,
-//                        fpnew_pkg::MERGED}, // DIVSQRT                        
-                    '{fpnew_pkg::PARALLEL,
-                        fpnew_pkg::PARALLEL,
-                        fpnew_pkg::PARALLEL,
-                        fpnew_pkg::PARALLEL,
-                        fpnew_pkg::PARALLEL,
-                        fpnew_pkg::PARALLEL}, // NONCOMP
-                    '{fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED},   // CONV
-                    '{fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED}},  // DOTP //should be removed for 32-bit version
-        PipeConfig: fpnew_pkg::BEFORE
-    },
-    '{
-        PipeRegs: // FMA Block
-                  '{
-                    '{  2, // FP32
-                        4, // FP64
-                        1, // FP16
-                        0, // FP8
-                        1, // FP16alt
-                        0  // FP8alt
-                      },
-                    '{1, 1, 1, 1, 1, 1},   // DIVSQRT
-                    '{1,
-                      1,
-                      1,
-                      1,
-                      1,
-                      1},   // NONCOMP
-                    '{2,
-                      2,
-                      2,
-                      2,
-                      2,
-                      2},   // CONV
-                    '{4,
-                      4,
-                      4,
-                      4,
-                      4,
-                      4}    // DOTP
-                    },
-        UnitTypes: '{'{fpnew_pkg::MERGED,
-                       fpnew_pkg::MERGED,
-                       fpnew_pkg::MERGED,
-                       fpnew_pkg::MERGED,
-                       fpnew_pkg::MERGED,
-                       fpnew_pkg::MERGED},  // FMA
-                    '{fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED}, // DIVSQRT
+                      '{fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED}, // DIVSQRT
 //                    '{fpnew_pkg::MERGED,
 //                        fpnew_pkg::MERGED,
 //                        fpnew_pkg::MERGED,

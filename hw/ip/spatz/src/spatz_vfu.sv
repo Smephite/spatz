@@ -43,6 +43,26 @@ module spatz_vfu
     output status_t          fpu_status_o
   );
 
+  // WARNING: Hack to add div/sqrt unit to FPU implementation.
+  // This only adds the div/sqrt unit to the first FPU instance.
+  // Currently this allwow the execution of scalar floating-point div/sqrt
+  // instructions only.
+  // When running a vector floating-point div/sqrt instruction,
+  // the core will hang.
+  function automatic fpnew_pkg::fpu_implementation_t add_div_to_fpu_impl(
+      fpnew_pkg::fpu_implementation_t in_impl
+  );
+      fpnew_pkg::fpu_implementation_t out_impl = in_impl;
+      out_impl.UnitTypes[1] = '{default: fpnew_pkg::MERGED};
+      return out_impl;
+  endfunction
+
+  localparam fpnew_pkg::fpu_implementation_t FPUImplementationList [N_FPU] = '{
+    0: add_div_to_fpu_impl(FPUImplementation),
+    default: FPUImplementation
+  };
+   
+
 // Include FF
 `include "common_cells/registers.svh"
 
@@ -1022,7 +1042,7 @@ module spatz_vfu
       
       fpnew_top #(
         .Features                   (FPUFeatures           ),
-        .Implementation             (FPUImplementation),
+        .Implementation             (FPUImplementationList[fpu] ),
         // .Implementation             (FPUImplementation),
         .TagType                    (vfu_tag_t             ),
         .StochasticRndImplementation(fpnew_pkg::DEFAULT_RSR)
