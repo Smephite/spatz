@@ -5,6 +5,7 @@
 /// RTL Top-level for `fesvr` simulation.
 module tb_bin;
   import "DPI-C" function int fesvr_tick();
+  import "DPI-C" function void tb_memory_dump(input string path);
 
   // This can't have a unit otherwise the simulation will not advance, for
   // whatever reason.
@@ -54,6 +55,19 @@ module tb_bin;
     end else begin
       $error("[FAILURE] Finished with exit code %2d", exit_code);
     end
+
+    begin
+      automatic string dump_file;
+      if ($value$plusargs("dump_l2=%s", dump_file))
+        tb_memory_dump(dump_file);
+    end
+
+    begin
+      automatic string dump_file;
+      if ($value$plusargs("dump_tcdm=%s", dump_file))
+        i_dut.dump_tcdm(dump_file);
+    end
+
     $finish;
   end
 

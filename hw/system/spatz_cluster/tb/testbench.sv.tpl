@@ -1,6 +1,13 @@
 // Copyright 2021 ETH Zurich and University of Bologna.
 // Solderpad Hardware License, Version 0.51, see LICENSE for details.
 // SPDX-License-Identifier: SHL-0.51
+<%
+  _nr_banks     = cfg['tcdm']['banks']
+  _data_bytes   = cfg['data_width'] // 8
+  _banks_per_sb = cfg['dma_data_width'] // cfg['data_width']
+  _nr_sb        = _nr_banks // _banks_per_sb
+  _depth        = cfg['tcdm'].get('depth', (cfg['tcdm']['size'] * 1024) // (_nr_banks * _data_bytes))
+%>
 
 `define wait_for(signal) \
   do @(negedge clk_i); while (!signal);
@@ -339,5 +346,38 @@ module testharness (
     .req_i (axi_from_cluster_req ),
     .rsp_o (axi_from_cluster_resp)
   );
+
+  /***************
+   *  TCDM Dump  *
+   ***************/
+
+  import "DPI-C" function void tb_tcdm_dump_open(
+    input string  path,
+    input longint base_addr,
+    input int     nr_banks,
+    input int     depth,
+    input int     data_bytes
+  );
+  import "DPI-C" function void tb_tcdm_dump_word(
+    input int     bank_idx,
+    input int     word_idx,
+    input longint data
+  );
+  import "DPI-C" function void tb_tcdm_dump_close();
+
+  task automatic dump_tcdm(input string path);
+    tb_tcdm_dump_open(path, longint'(TCDMStartAddr),
+                      ${_nr_banks}, ${_depth}, ${_data_bytes});
+% for i in range(_nr_sb):
+%   for j in range(_banks_per_sb):
+<%  bank_idx = i * _banks_per_sb + j %>\
+    for (int w = 0; w < ${_depth}; w++)
+      tb_tcdm_dump_word(${bank_idx}, w,
+        longint'(i_cluster_wrapper.i_cluster\
+.gen_tcdm_super_bank[${i}].gen_tcdm_bank[${j}].i_data_mem.i_tc_sram.sram[w]));
+%   endfor
+% endfor
+    tb_tcdm_dump_close();
+  endtask
 
 endmodule : testharness

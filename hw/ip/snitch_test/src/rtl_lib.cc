@@ -19,6 +19,13 @@ int get_entry_point();
 void tb_memory_read(long long addr, int len, const svOpenArrayHandle data);
 void tb_memory_write(long long addr, int len, const svOpenArrayHandle data,
                      const svOpenArrayHandle strb);
+void tb_memory_dump(const char *path);
+void tb_tcdm_dump_open(const char *path, unsigned long long base_addr,
+                       unsigned int nr_banks, unsigned int depth,
+                       unsigned int data_bytes);
+void tb_tcdm_dump_word(unsigned int bank_idx, unsigned int word_idx,
+                       unsigned long long data);
+void tb_tcdm_dump_close();
 }
 
 namespace sim {
@@ -129,4 +136,23 @@ void tb_memory_write(long long addr, int len, const svOpenArrayHandle data,
 
 int get_entry_point() {
   return s->entry_point();
+}
+
+void tb_memory_dump(const char *path) {
+    sim::MEM.dump(path);
+}
+
+void tb_tcdm_dump_open(const char *path, unsigned long long base_addr,
+                       unsigned int nr_banks, unsigned int depth,
+                       unsigned int data_bytes) {
+    sim::TCDM_DUMP.open(path, base_addr, nr_banks, depth, data_bytes);
+}
+
+void tb_tcdm_dump_word(unsigned int bank_idx, unsigned int word_idx,
+                       unsigned long long data) {
+    sim::TCDM_DUMP.write_word(bank_idx, word_idx, data);
+}
+
+void tb_tcdm_dump_close() {
+    sim::TCDM_DUMP.close();
 }

@@ -2,6 +2,7 @@
 // Solderpad Hardware License, Version 0.51, see LICENSE for details.
 // SPDX-License-Identifier: SHL-0.51
 
+
 `define wait_for(signal)   do @(negedge clk_i); while (!signal);
 
 `include "axi/assign.svh"
@@ -177,5 +178,77 @@ module testharness (
     .req_i (axi_from_cluster_req ),
     .rsp_o (axi_from_cluster_resp)
   );
+
+  /***************
+   *  TCDM Dump  *
+   ***************/
+
+  import "DPI-C" function void tb_tcdm_dump_open(
+    input string  path,
+    input longint base_addr,
+    input int     nr_banks,
+    input int     depth,
+    input int     data_bytes
+  );
+  import "DPI-C" function void tb_tcdm_dump_word(
+    input int     bank_idx,
+    input int     word_idx,
+    input longint data
+  );
+  import "DPI-C" function void tb_tcdm_dump_close();
+
+  task automatic dump_tcdm(input string path);
+    tb_tcdm_dump_open(path, longint'(TCDMStartAddr),
+                      16, 1024, 8);
+    for (int w = 0; w < 1024; w++)
+      tb_tcdm_dump_word(0, w,
+        longint'(i_cluster_wrapper.i_cluster.gen_tcdm_super_bank[0].gen_tcdm_bank[0].i_data_mem.i_tc_sram.sram[w]));
+    for (int w = 0; w < 1024; w++)
+      tb_tcdm_dump_word(1, w,
+        longint'(i_cluster_wrapper.i_cluster.gen_tcdm_super_bank[0].gen_tcdm_bank[1].i_data_mem.i_tc_sram.sram[w]));
+    for (int w = 0; w < 1024; w++)
+      tb_tcdm_dump_word(2, w,
+        longint'(i_cluster_wrapper.i_cluster.gen_tcdm_super_bank[0].gen_tcdm_bank[2].i_data_mem.i_tc_sram.sram[w]));
+    for (int w = 0; w < 1024; w++)
+      tb_tcdm_dump_word(3, w,
+        longint'(i_cluster_wrapper.i_cluster.gen_tcdm_super_bank[0].gen_tcdm_bank[3].i_data_mem.i_tc_sram.sram[w]));
+    for (int w = 0; w < 1024; w++)
+      tb_tcdm_dump_word(4, w,
+        longint'(i_cluster_wrapper.i_cluster.gen_tcdm_super_bank[0].gen_tcdm_bank[4].i_data_mem.i_tc_sram.sram[w]));
+    for (int w = 0; w < 1024; w++)
+      tb_tcdm_dump_word(5, w,
+        longint'(i_cluster_wrapper.i_cluster.gen_tcdm_super_bank[0].gen_tcdm_bank[5].i_data_mem.i_tc_sram.sram[w]));
+    for (int w = 0; w < 1024; w++)
+      tb_tcdm_dump_word(6, w,
+        longint'(i_cluster_wrapper.i_cluster.gen_tcdm_super_bank[0].gen_tcdm_bank[6].i_data_mem.i_tc_sram.sram[w]));
+    for (int w = 0; w < 1024; w++)
+      tb_tcdm_dump_word(7, w,
+        longint'(i_cluster_wrapper.i_cluster.gen_tcdm_super_bank[0].gen_tcdm_bank[7].i_data_mem.i_tc_sram.sram[w]));
+    for (int w = 0; w < 1024; w++)
+      tb_tcdm_dump_word(8, w,
+        longint'(i_cluster_wrapper.i_cluster.gen_tcdm_super_bank[1].gen_tcdm_bank[0].i_data_mem.i_tc_sram.sram[w]));
+    for (int w = 0; w < 1024; w++)
+      tb_tcdm_dump_word(9, w,
+        longint'(i_cluster_wrapper.i_cluster.gen_tcdm_super_bank[1].gen_tcdm_bank[1].i_data_mem.i_tc_sram.sram[w]));
+    for (int w = 0; w < 1024; w++)
+      tb_tcdm_dump_word(10, w,
+        longint'(i_cluster_wrapper.i_cluster.gen_tcdm_super_bank[1].gen_tcdm_bank[2].i_data_mem.i_tc_sram.sram[w]));
+    for (int w = 0; w < 1024; w++)
+      tb_tcdm_dump_word(11, w,
+        longint'(i_cluster_wrapper.i_cluster.gen_tcdm_super_bank[1].gen_tcdm_bank[3].i_data_mem.i_tc_sram.sram[w]));
+    for (int w = 0; w < 1024; w++)
+      tb_tcdm_dump_word(12, w,
+        longint'(i_cluster_wrapper.i_cluster.gen_tcdm_super_bank[1].gen_tcdm_bank[4].i_data_mem.i_tc_sram.sram[w]));
+    for (int w = 0; w < 1024; w++)
+      tb_tcdm_dump_word(13, w,
+        longint'(i_cluster_wrapper.i_cluster.gen_tcdm_super_bank[1].gen_tcdm_bank[5].i_data_mem.i_tc_sram.sram[w]));
+    for (int w = 0; w < 1024; w++)
+      tb_tcdm_dump_word(14, w,
+        longint'(i_cluster_wrapper.i_cluster.gen_tcdm_super_bank[1].gen_tcdm_bank[6].i_data_mem.i_tc_sram.sram[w]));
+    for (int w = 0; w < 1024; w++)
+      tb_tcdm_dump_word(15, w,
+        longint'(i_cluster_wrapper.i_cluster.gen_tcdm_super_bank[1].gen_tcdm_bank[7].i_data_mem.i_tc_sram.sram[w]));
+    tb_tcdm_dump_close();
+  endtask
 
 endmodule : testharness

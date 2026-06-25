@@ -12,6 +12,8 @@ namespace sim {
 // The global memory all memory ports write into.
 GlobalMemory MEM;
 
+TcdmDump TCDM_DUMP;
+
 // Override HTIF to populate bootloader with system specification and entry
 // symbol.
 void Sim::start() {

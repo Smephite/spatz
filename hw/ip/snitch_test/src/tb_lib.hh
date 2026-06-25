@@ -8,6 +8,10 @@
 #pragma once
 #include "sim.hh"
 
+#include <algorithm>
+#include <cstdio>
+#include <cstring>
+
 namespace sim {
 
 struct GlobalMemory {
@@ -77,6 +81,28 @@ struct GlobalMemory {
         std::cout << std::dec;
     }
 
+    // Dump all written pages to a binary file.
+    // Format: repeated records of { uint64_t base_addr, uint8_t[PAGE_SIZE] data },
+    // sorted ascending by address, little-endian.
+    void dump(const char *path) {
+        std::vector<uint64_t> sorted_pages(touched.begin(), touched.end());
+        std::sort(sorted_pages.begin(), sorted_pages.end());
+        FILE *f = fopen(path, "wb");
+        if (!f) {
+            fprintf(stderr, "[TB] Failed to open dump file: %s\n", path);
+            return;
+        }
+        for (uint64_t page_idx : sorted_pages) {
+            uint64_t base_addr = page_idx << ADDR_SHIFT;
+            fwrite(&base_addr, sizeof(base_addr), 1, f);
+            fwrite(pages.at(page_idx).get(), PAGE_SIZE, 1, f);
+        }
+        fclose(f);
+        fprintf(stderr, "[TB] Dumped %zu pages (%zu KiB) to %s\n",
+                sorted_pages.size(), sorted_pages.size() * PAGE_SIZE / 1024,
+                path);
+    }
+
     // Copy a chunk of data out of the memory.
     void read(size_t addr, size_t len, uint8_t *data) {
         // std::cout << "[GlobalMemory] Read " << std::hex << addr << std::dec
@@ -114,6 +140,48 @@ struct GlobalMemory {
 
 // The global memory all memory ports write into.
 extern GlobalMemory MEM;
+
+// Accumulates TCDM words written bank-by-bank from SV and flushes them in
+// address order.  Format: uint64_t base_addr, uint64_t total_bytes, then the
+// flat byte image in address order.
+struct TcdmDump {
+    uint64_t base_addr  = 0;
+    uint32_t nr_banks   = 0;
+    uint32_t depth      = 0;
+    uint32_t data_bytes = 0;
+    std::string path;
+    std::vector<uint8_t> buf;
+
+    void open(const char *p, uint64_t ba, uint32_t nb, uint32_t d,
+              uint32_t db) {
+        path = p; base_addr = ba; nr_banks = nb; depth = d; data_bytes = db;
+        buf.assign((size_t)nb * d * db, 0);
+    }
+
+    // bank_idx: global bank index (superbank * banks_per_sb + bank_within_sb)
+    void write_word(uint32_t bank_idx, uint32_t word_idx, uint64_t word) {
+        size_t off = ((size_t)word_idx * nr_banks + bank_idx) * data_bytes;
+        std::memcpy(buf.data() + off, &word, data_bytes);
+    }
+
+    void close() {
+        FILE *f = fopen(path.c_str(), "wb");
+        if (!f) {
+            fprintf(stderr, "[TB] Failed to open TCDM dump file: %s\n",
+                    path.c_str());
+            return;
+        }
+        uint64_t total = buf.size();
+        fwrite(&base_addr, sizeof(base_addr), 1, f);
+        fwrite(&total,     sizeof(total),     1, f);
+        fwrite(buf.data(), 1, buf.size(), f);
+        fclose(f);
+        fprintf(stderr, "[TB] Dumped %zu KiB of TCDM to %s\n",
+                buf.size() / 1024, path.c_str());
+    }
+};
+
+extern TcdmDump TCDM_DUMP;
 
 // The boot data generated along with the system RTL.
 struct BootData {
