@@ -371,7 +371,7 @@ module spatz_cc
       .acc_qdata_op_i   ( acc_snitch_req.data_op   ),
       .acc_qdata_arga_i ( acc_snitch_req.data_arga ),
       .acc_qdata_argb_i ( acc_snitch_req.data_argb ),
-      .acc_qdata_argc_i ( acc_snitch_req.data_argc ),
+      .acc_qdata_argc_i ( acc_snitch_req.data_argc[AddrWidth-1:0] ),
       .acc_qvalid_i     ( dma_qvalid               ),
       .acc_qready_o     ( dma_qready               ),
       .acc_pdata_o      ( dma_resp.data            ),

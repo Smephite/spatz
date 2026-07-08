@@ -619,7 +619,7 @@ module spatz_fpu_sequencer
 `ifdef MEMPOOL_SPATZ
     fp_lsu_qaddr   = issue_req_i.data_argb;
 `else
-    fp_lsu_qaddr   = issue_req_i.data_argc;
+    fp_lsu_qaddr   = issue_req_i.data_argc[AddrWidth-1:0];
 `endif
     fp_lsu_qdata   = fpr_rdata[1];
     fp_lsu_qsize   = ls_size;
