@@ -513,8 +513,17 @@ module snitch import snitch_pkg::*; import riscv_instr::*; #(
                       & operands_ready
                       & dst_ready
                       & ((itlb_valid & itlb_ready) | ~trans_active);
+  // An offloaded FP instruction is still in flight (isfloat), or its status
+  // flags are arriving on fpu_status_i this very cycle (the accelerator's
+  // status path is registered, so flags land one cycle after isfloat clears)
+  // and have not been accumulated into fcsr_q yet. While this holds, an
+  // fflags/frm/fcsr read must stall and an fflags write must be suppressed,
+  // otherwise the read returns stale flags and the write clobbers the
+  // arriving ones.
+  logic fp_flags_in_flight;
+  assign fp_flags_in_flight = acc_qrsp_i.isfloat || (|fpu_status_i);
   // the accelerator interface stalled us
-  assign acc_stall = (acc_qvalid_o & ~acc_qready_i) || (read_fcsr && acc_qrsp_i.isfloat);
+  assign acc_stall = (acc_qvalid_o & ~acc_qready_i) || (read_fcsr && fp_flags_in_flight);
   // the LSU Interface didn't accept our request yet
   assign lsu_stall = (lsu_tlb_qvalid & ~lsu_tlb_qready) || acc_mem_stall;
   // Stall the stage if we either didn't get a valid instruction or the LSU/Accelerator is not ready
@@ -3150,7 +3159,7 @@ module snitch import snitch_pkg::*; import riscv_instr::*; #(
             if (FP_EN) begin
               csr_rvalue = {27'b0, fcsr_q.fflags};
               read_fcsr  = 1'b1;
-              if (!exception) fcsr_d.fflags = fpnew_pkg::status_t'(alu_result[4:0]);
+              if (!exception && !fp_flags_in_flight) fcsr_d.fflags = fpnew_pkg::status_t'(alu_result[4:0]);
             end else illegal_csr = 1'b1;
           end
           CSR_FRM: begin
@@ -3171,7 +3180,7 @@ module snitch import snitch_pkg::*; import riscv_instr::*; #(
             if (FP_EN) begin
               csr_rvalue = {22'b0, fcsr_q};
               read_fcsr  = 1'b1;
-              if (!exception) fcsr_d = fcsr_t'(alu_result[9:0]);
+              if (!exception && !fp_flags_in_flight) fcsr_d = fcsr_t'(alu_result[9:0]);
             end else illegal_csr = 1'b1;
           end
           default: csr_rvalue = '0;
