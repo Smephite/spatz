@@ -452,8 +452,17 @@ package spatz_pkg;
 
   function automatic spatz_fp64_t widen_fp32_to_fp64(spatz_fp32_t operand);
     widen_fp32_to_fp64.sign     = operand.sign;
-    widen_fp32_to_fp64.exponent = int'(operand.exponent - 127) + 1023;
     widen_fp32_to_fp64.mantissa = {operand.mantissa, 29'b0};
+    // IEEE special exponents must not be re-biased arithmetically: exp==0xff is
+    // Inf/NaN -> all-ones dst exponent (a widened NaN stays a NaN; fcvt.d.s of a
+    // qNaN then canonicalises correctly); exp==0x00 is zero/subnormal -> map to
+    // zero exponent so +/-0 widens to +/-0. Subnormal inputs (exp==0, mant!=0)
+    // are NOT renormalised here -- pre-existing limitation, not exercised.
+    unique case (operand.exponent)
+      8'hff:   widen_fp32_to_fp64.exponent = 11'h7ff;
+      8'h00:   widen_fp32_to_fp64.exponent = 11'h000;
+      default: widen_fp32_to_fp64.exponent = int'(operand.exponent - 127) + 1023;
+    endcase
   endfunction
 
   function automatic spatz_fp32_t widen_fp16_to_fp32(spatz_fp16_t operand);

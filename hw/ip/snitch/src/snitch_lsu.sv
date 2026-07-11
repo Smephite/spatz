@@ -167,7 +167,7 @@ module snitch_lsu #(
     unique case (laq_out.size)
       2'b00: ld_result = {{56{(shifted_data[7] | NaNBox) & laq_out.sign_ext}}, shifted_data[7:0]};
       2'b01: ld_result = {{48{(shifted_data[15] | NaNBox) & laq_out.sign_ext}}, shifted_data[15:0]};
-      2'b10: ld_result = {{32{(shifted_data[31] | NaNBox) & laq_out.sign_ext}}, shifted_data[31:0]};
+      2'b10: ld_result = {{32{(shifted_data[31] & laq_out.sign_ext) | NaNBox}}, shifted_data[31:0]};
       2'b11: ld_result = shifted_data;
       default: ld_result = shifted_data;
     endcase

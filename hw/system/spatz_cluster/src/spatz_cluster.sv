@@ -322,7 +322,7 @@ module spatz_cluster
     logic [31:0] data_op;
     data_t data_arga;
     data_t data_argb;
-    addr_t data_argc;
+    data_t data_argc;
   } acc_issue_req_t;
 
   typedef struct packed {

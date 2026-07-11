@@ -870,14 +870,20 @@ module spatz_vfu
             if (RVD) begin
               fpu_src_fmt = fpnew_pkg::FP64;
               fpu_dst_fmt = fpnew_pkg::FP64;
-              fpu_int_fmt = fpnew_pkg::INT64;
+              // Scalar fcvt.w.d/wu.d is decoded EW_64 to select FP64, but its integer
+              // operand/result is a 32-bit GPR; INT64 would saturate/return the wrong
+              // low word. Vector EW_64 fcvt keeps INT64.
+              fpu_int_fmt = spatz_req.op_arith.is_scalar ? fpnew_pkg::INT32 : fpnew_pkg::INT64;
             end
           end
           EW_32: begin
             fpu_src_fmt      = spatz_req.op_arith.is_narrowing || spatz_req.op_arith.widen_vs1 || spatz_req.op_arith.widen_vs2 ? fpnew_pkg::FP64 : fpnew_pkg::FP32;
             fpu_dst_fmt      = spatz_req.op_arith.widen_vs1 || spatz_req.op_arith.widen_vs2 || spatz_req.op == VSDOTP ? fpnew_pkg::FP64          : fpnew_pkg::FP32;
             fpu_int_fmt      = spatz_req.op_arith.is_narrowing && spatz_req.op inside {VI2F, VU2F} ? fpnew_pkg::INT64                            : fpnew_pkg::INT32;
-            fpu_vectorial_op = FLEN > 32;
+            // fclass returns a per-lane packed class encoding in vectorial mode; run
+            // the scalar class op non-vectorial so it yields the RISC-V 10-bit mask.
+            // Other scalar ops stay vectorial and rely on the SIMD mask below.
+            fpu_vectorial_op = (FLEN > 32) && !(spatz_req.op_arith.is_scalar && spatz_req.op == VFCLASS);
           end
           EW_16: begin
             fpu_src_fmt      = spatz_req.op_arith.is_narrowing || spatz_req.op_arith.widen_vs1 || spatz_req.op_arith.widen_vs2 ? fpnew_pkg::FP32 : (spatz_req.fm.src ? fpnew_pkg::FP16ALT : fpnew_pkg::FP16);
@@ -1030,6 +1036,14 @@ module spatz_vfu
       `FFL(fpu_int_fmt_q, fpu_int_fmt, int_fpu_in_valid && int_fpu_in_ready, fpnew_pkg::INT8)
       `FFL(fpu_op_mode_q, fpu_op_mode, int_fpu_in_valid && int_fpu_in_ready, 1'b0)
       `FFL(fpu_vectorial_op_q, fpu_vectorial_op, int_fpu_in_valid && int_fpu_in_ready, 1'b0)
+
+      // A scalar FP op replicates its operand across the FPU's SIMD lanes but only
+      // lane 0 holds the real value; the upper lanes see NaN-box bits. Mask them so
+      // their spurious results/flags do not merge into status_o.
+      localparam int unsigned FPUNumLanes = fpnew_pkg::max_num_lanes(FPUFeatures.Width, FPUFeatures.FpFmtMask, FPUFeatures.EnableVectors);
+      logic [FPUNumLanes-1:0] fpu_simd_mask, fpu_simd_mask_q;
+      assign fpu_simd_mask = spatz_req.op_arith.is_scalar ? {{(FPUNumLanes-1){1'b0}}, 1'b1} : '1;
+      `FFL(fpu_simd_mask_q, fpu_simd_mask, int_fpu_in_valid && int_fpu_in_ready, '1)
       `FFL(rm_q, spatz_req.rm, int_fpu_in_valid && int_fpu_in_ready, fpnew_pkg::RNE)
       `FFL(input_tag_q, input_tag, int_fpu_in_valid && int_fpu_in_ready, '{vsew: EW_8, default: '0})
       `FFL(fpu_in_valid_q, int_fpu_in_valid, int_fpu_in_ready, 1'b0)
@@ -1045,6 +1059,7 @@ module spatz_vfu
         .Implementation             (FPUImplementationList[fpu] ),
         // .Implementation             (FPUImplementation),
         .TagType                    (vfu_tag_t             ),
+        .EnableSIMDMask             (1'b1                  ),
         .StochasticRndImplementation(fpnew_pkg::DEFAULT_RSR)
       ) i_fpu (
         .clk_i         (clk_i                                                  ),
@@ -1063,7 +1078,7 @@ module spatz_vfu
         .vectorial_op_i(fpu_vectorial_op_q                                     ),
         .op_mod_i      (fpu_op_mode_q                                          ),
         .tag_i         (input_tag_q                                            ),
-        .simd_mask_i   ('1                                                     ),
+        .simd_mask_i   (fpu_simd_mask_q                                        ),
         .rnd_mode_i    (rm_q                                                   ),
         .result_o      (fpu_result[fpu*ELEN +: ELEN]                           ),
         .out_valid_o   (int_fpu_result_valid                                   ),

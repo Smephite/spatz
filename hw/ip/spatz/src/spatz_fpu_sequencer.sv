@@ -610,7 +610,7 @@ module spatz_fpu_sequencer
 `ifdef MEMPOOL_SPATZ
     fp_lsu_qaddr   = issue_req_i.data_argb;
 `else
-    fp_lsu_qaddr   = issue_req_i.data_argc;
+    fp_lsu_qaddr   = issue_req_i.data_argc[AddrWidth-1:0];
 `endif
     fp_lsu_qdata   = fpr_rdata[1];
     fp_lsu_qsize   = ls_size;
@@ -765,7 +765,16 @@ module spatz_fpu_sequencer
     end
     // Commit moves to the RF
     else if (is_move && use_fd && !stall) begin
-      fpr_wdata[1] = issue_req_i.data_arga;
+      // GPR->FPR moves deliver a value narrower than FLEN. NaN-box it (upper
+      // bits all-ones) so a later narrow FP op (e.g. fclass.s) sees a validly
+      // boxed operand; without this, +0.0 (all-zero upper word) is misclassified
+      // as qNaN. Widths where FLEN==move-width produce a zero-width fill (no-op).
+      unique casez (issue_req_i.data_op)
+        riscv_instr::FMV_S_X: fpr_wdata[1] = {{(FLEN-32){1'b1}}, issue_req_i.data_arga[31:0]};
+        riscv_instr::FMV_H_X: fpr_wdata[1] = {{(FLEN-16){1'b1}}, issue_req_i.data_arga[15:0]};
+        riscv_instr::FMV_B_X: fpr_wdata[1] = {{(FLEN- 8){1'b1}}, issue_req_i.data_arga[ 7:0]};
+        default:              fpr_wdata[1] = issue_req_i.data_arga;
+      endcase
       fpr_waddr[1] = fd;
       fpr_we[1]    = 1'b1;
     end
